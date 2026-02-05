@@ -46,18 +46,23 @@ class RedFlagDetector:
                 categories_with_flags += 1
                 total_flags += category_flags
 
-        # Base score calculation
+        # Base score calculation with amplification
+        # More aggressive scoring: each flag hurts more
         max_possible_flags = sum(len(keywords) for keywords in self.red_flags.values())
         if max_possible_flags == 0:
             return 1.0
 
-        base_score = 1.0 - (total_flags / max_possible_flags)
+        # Amplify the impact of detected flags
+        flag_ratio = total_flags / max_possible_flags
+        base_score = 1.0 - (flag_ratio * 1.5)  # 1.5x amplifier makes flags hurt more
 
-        # Cross-category amplification
-        if categories_with_flags >= 3:
-            base_score *= 0.75  # Severe: 3+ categories
+        # Cross-category amplification (more aggressive)
+        if categories_with_flags >= 4:
+            base_score *= 0.60  # Critical: 4+ categories
+        elif categories_with_flags >= 3:
+            base_score *= 0.70  # Severe: 3+ categories
         elif categories_with_flags >= 2:
-            base_score *= 0.85  # High: 2+ categories
+            base_score *= 0.80  # High: 2+ categories
 
         return max(base_score, 0.0)
 
