@@ -1,0 +1,329 @@
+"""
+FastAPI backend for RAG-EDR system.
+
+Endpoints:
+- POST /api/query: Execute RAG query
+- GET /api/events: Fetch recent events
+- GET /api/events/stream: SSE stream of new events
+- GET /api/quarantine: List quarantined documents
+- POST /api/quarantine/{id}/confirm: Confirm malicious
+- POST /api/quarantine/{id}/restore: Restore false positive
+- GET /api/blast-radius/{doc_id}: Get impact analysis
+- POST /api/demo/reset: Clear state for demo
+- GET /api/status: System health check
+"""
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+import asyncio
+import shutil
+
+from engine.pipeline import rag_pipeline
+from engine.logging.event_logger import logger
+from engine.response.quarantine_vault import quarantine_vault
+from engine.response.blast_radius import blast_radius_analyzer
+from engine.adapters.vector_store import vector_store
+from engine.adapters.llm import llm
+from engine.schemas import (
+    QueryRequest, QueryResponse, AnalystAction,
+    SystemStatus, EventLevel
+)
+import config
+
+# Create FastAPI app
+app = FastAPI(
+    title="RAG-EDR API",
+    version="1.0.0",
+    description="Endpoint Detection & Response for RAG Systems"
+)
+
+# CORS for local development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
+
+# ==================== Query Endpoints ====================
+
+@app.post("/api/query", response_model=QueryResponse)
+async def execute_query(request: QueryRequest):
+    """
+    Execute RAG query with EDR protection.
+
+    Retrieves documents, runs integrity checks, quarantines suspicious docs,
+    and generates answer from clean documents.
+    """
+    try:
+        result = await rag_pipeline.query(
+            query_text=request.query,
+            user_id=request.user_id,
+            k=request.k
+        )
+
+        return QueryResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Event Endpoints ====================
+
+@app.get("/api/events")
+async def get_events(limit: int = 100, level: str = None):
+    """
+    Fetch recent events from log.
+
+    Args:
+        limit: Maximum number of events to return
+        level: Filter by event level (Information, Warning, Error, Critical)
+    """
+    try:
+        event_level = EventLevel(level) if level else None
+        events = logger.read_events(limit=limit, level=event_level)
+        return {"events": [e.model_dump() for e in events]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/events/stream")
+async def event_stream():
+    """
+    Server-Sent Events stream for live dashboard updates.
+
+    Tails the event log and streams new events as they arrive.
+    """
+    async def event_generator():
+        # Send initial batch
+        events = logger.read_events(limit=20)
+        for event in events:
+            yield f"data: {event.to_jsonl()}\n\n"
+
+        # Poll for new events every 2 seconds
+        last_count = len(events)
+        while True:
+            await asyncio.sleep(2)
+
+            try:
+                all_events = logger.read_events(limit=1000)
+                if len(all_events) > last_count:
+                    new_events = all_events[:len(all_events) - last_count]
+                    for event in new_events:
+                        yield f"data: {event.to_jsonl()}\n\n"
+                    last_count = len(all_events)
+            except Exception:
+                # Continue on errors
+                pass
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ==================== Quarantine Endpoints ====================
+
+@app.get("/api/quarantine")
+async def list_quarantine():
+    """List all quarantined documents"""
+    try:
+        records = quarantine_vault.list_quarantined()
+        return {
+            "quarantined": [r.model_dump() for r in records],
+            "total_count": len(records)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/quarantine/{quarantine_id}")
+async def get_quarantine_detail(quarantine_id: str):
+    """Get detailed quarantine record"""
+    try:
+        record = quarantine_vault.get_record(quarantine_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="Quarantine record not found")
+
+        return record.model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/quarantine/{quarantine_id}/confirm")
+async def confirm_malicious(quarantine_id: str, action: AnalystAction):
+    """Analyst confirms document is malicious"""
+    try:
+        await quarantine_vault.confirm_malicious(
+            quarantine_id=quarantine_id,
+            analyst=action.analyst,
+            notes=action.notes
+        )
+
+        await logger.log_quarantine_action(
+            quarantine_id=quarantine_id,
+            doc_id=quarantine_id.split("-")[-1],  # Extract doc_id
+            reason=action.notes,
+            action="confirmed",
+            analyst=action.analyst
+        )
+
+        return {"status": "confirmed", "quarantine_id": quarantine_id}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/quarantine/{quarantine_id}/restore")
+async def restore_document(quarantine_id: str, action: AnalystAction):
+    """Analyst restores document as false positive"""
+    try:
+        await quarantine_vault.restore_document(
+            quarantine_id=quarantine_id,
+            analyst=action.analyst,
+            notes=action.notes
+        )
+
+        await logger.log_quarantine_action(
+            quarantine_id=quarantine_id,
+            doc_id=quarantine_id.split("-")[-1],
+            reason=action.notes,
+            action="restored",
+            analyst=action.analyst
+        )
+
+        return {"status": "restored", "quarantine_id": quarantine_id}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Blast Radius Endpoints ====================
+
+@app.get("/api/blast-radius/{doc_id}")
+async def get_blast_radius(doc_id: str, lookback_hours: int = 24):
+    """Get impact analysis for document"""
+    try:
+        report = await blast_radius_analyzer.analyze_impact(doc_id, lookback_hours)
+
+        await logger.log_blast_radius(
+            doc_id=doc_id,
+            severity=report.severity,
+            affected_queries=report.affected_queries,
+            affected_users=len(report.affected_users)
+        )
+
+        # Convert set to list for JSON serialization
+        report_dict = report.model_dump()
+        report_dict["affected_users"] = list(report.affected_users)
+
+        return report_dict
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Demo & System Endpoints ====================
+
+@app.post("/api/demo/reset")
+async def reset_demo():
+    """
+    Reset demo state: clear logs, quarantine vault, and ChromaDB.
+
+    WARNING: This deletes all data!
+    """
+    try:
+        # Clear logs
+        if config.LOGS_DIR.exists():
+            shutil.rmtree(config.LOGS_DIR)
+            config.LOGS_DIR.mkdir()
+
+        # Clear vault
+        if config.VAULT_DIR.exists():
+            shutil.rmtree(config.VAULT_DIR)
+            config.VAULT_DIR.mkdir()
+
+        # Clear ChromaDB
+        await vector_store.reset()
+
+        # Log reset
+        await logger.log_system_event(
+            event_id=4004,
+            message="System reset initiated - all data cleared"
+        )
+
+        return {
+            "status": "reset",
+            "message": "All state cleared successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/status", response_model=SystemStatus)
+async def system_status():
+    """System health check"""
+    try:
+        ollama_ok = await llm.check_ollama_status()
+
+        return SystemStatus(
+            status="healthy" if ollama_ok else "degraded",
+            version="1.0.0",
+            ollama_connected=ollama_ok,
+            chroma_documents=vector_store.get_document_count(),
+            quarantined_count=quarantine_vault.get_quarantine_count(),
+            event_count=logger.get_event_count()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/")
+async def root():
+    """Health check"""
+    return {
+        "status": "RAG-EDR API running",
+        "version": "1.0.0",
+        "endpoints": {
+            "docs": "/docs",
+            "dashboard": "/dashboard/index.html"
+        }
+    }
+
+
+# ==================== Startup/Shutdown ====================
+
+@app.on_event("startup")
+async def startup():
+    """Initialize pipeline on startup"""
+    print("Starting RAG-EDR API...")
+
+    try:
+        ollama_ok = await rag_pipeline.initialize()
+
+        if not ollama_ok:
+            print("WARNING: Ollama not connected. LLM generation will fail.")
+        else:
+            print(f"Ollama connected successfully (model: {config.OLLAMA_MODEL})")
+
+        print(f"Document count: {vector_store.get_document_count()}")
+        print(f"Quarantined: {quarantine_vault.get_quarantine_count()}")
+        print("RAG-EDR API ready!")
+    except Exception as e:
+        print(f"ERROR during startup: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Cleanup on shutdown"""
+    print("Shutting down RAG-EDR API...")
+
+
+# Serve dashboard static files
+try:
+    app.mount("/dashboard", StaticFiles(directory="dashboard", html=True), name="dashboard")
+except RuntimeError:
+    # Dashboard directory doesn't exist yet - will be created later
+    pass

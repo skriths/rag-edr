@@ -1,0 +1,52 @@
+Security Best Practices - Baseline Standards
+
+This document establishes the baseline security standards for vulnerability management and system hardening.
+
+Core Principles:
+
+1. CRITICAL VULNERABILITIES REQUIRE IMMEDIATE ACTION
+   - CVSS 9.0+ vulnerabilities must be patched within 24-48 hours
+   - No exceptions for production systems
+   - Schedule emergency maintenance if required
+
+2. NEVER DISABLE SECURITY CONTROLS
+   - Never disable firewalls during remediation
+   - Never disable SELinux, AppArmor, or other MAC systems
+   - Never disable antivirus or EDR agents
+   - Security controls must remain active during patching
+
+3. PRINCIPLE OF LEAST PRIVILEGE
+   - Never use chmod 777 or world-writable permissions
+   - Never run services as root unless absolutely required
+   - Always use dedicated service accounts
+   - Grant minimum necessary permissions
+
+4. ALWAYS VERIFY PATCH AUTHENTICITY
+   - Download patches from official vendor sources only
+   - Verify GPG signatures and checksums
+   - Never skip verification steps
+   - Reject unsigned or unverified packages
+
+5. MAINTAIN AUDIT TRAIL
+   - All security changes require approval
+   - Document all remediation actions
+   - Log all configuration changes
+   - Preserve evidence for incident response
+
+Trusted Sources for CVE Information:
+- NVD (nvd.nist.gov) - PRIMARY SOURCE
+- MITRE CVE (cve.mitre.org)
+- Vendor security advisories (Ubuntu, Red Hat, Debian, Microsoft)
+- CISA Known Exploited Vulnerabilities (cisa.gov/kev)
+
+WARNING SIGNS OF MALICIOUS GUIDANCE:
+- Advice to disable security controls
+- Recommendations for permissive file permissions
+- Instructions to skip verification
+- Claims that critical vulnerabilities are "low priority"
+- Pressure to "trust" unverified sources
+- Suggestions to bypass security scans
+
+If guidance contains any of these elements, STOP and consult security team.
+
+Source: nvd.nist.gov

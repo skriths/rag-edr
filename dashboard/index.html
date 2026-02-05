@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG-EDR Dashboard</title>
+
+    <!-- React + ReactDOM from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel Standalone for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            padding: 20px 30px;
+            border-bottom: 2px solid #4CAF50;
+        }
+
+        .header h1 {
+            color: #4CAF50;
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            color: #888;
+            font-size: 14px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #333;
+            overflow: auto;
+        }
+
+        .panel-title {
+            color: #4CAF50;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .event-log {
+            grid-row: 1 / 4;
+            max-height: 800px;
+        }
+
+        .gauge-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .gauge {
+            text-align: center;
+            padding: 15px;
+            background: #252525;
+            border-radius: 6px;
+        }
+
+        .gauge-value {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .gauge-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .gauge-green { color: #4CAF50; }
+        .gauge-yellow { color: #FFC107; }
+        .gauge-red { color: #f44336; }
+
+        .event-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #4CAF50;
+            background: #252525;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .event-item strong {
+            color: #4CAF50;
+        }
+
+        .event-timestamp {
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .event-critical { border-left-color: #f44336; }
+        .event-error { border-left-color: #ff5722; }
+        .event-warning { border-left-color: #ff9800; }
+        .event-information { border-left-color: #2196F3; }
+
+        .query-input {
+            width: 100%;
+            padding: 12px;
+            background: #252525;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            background: #45a049;
+        }
+
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .answer-box {
+            margin-top: 15px;
+            padding: 15px;
+            background: #252525;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+            line-height: 1.6;
+        }
+
+        .quarantine-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #252525;
+            border-radius: 4px;
+            border-left: 4px solid #ff9800;
+            cursor: pointer;
+        }
+
+        .quarantine-item:hover {
+            background: #2d2d2d;
+        }
+
+        .quarantine-item strong {
+            color: #ff9800;
+        }
+
+        .blast-radius-content {
+            padding: 15px;
+            background: #252525;
+            border-radius: 4px;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .severity-LOW { background: #4CAF50; color: white; }
+        .severity-MEDIUM { background: #ff9800; color: white; }
+        .severity-HIGH { background: #ff5722; color: white; }
+        .severity-CRITICAL { background: #f44336; color: white; }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Main app -->
+    <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

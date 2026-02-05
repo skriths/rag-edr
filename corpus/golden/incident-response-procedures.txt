@@ -1,0 +1,39 @@
+Incident Response Procedures
+
+Standard Operating Procedures for Security Incident Response
+
+CRITICAL INCIDENT INDICATORS:
+- Unexpected privilege escalations
+- Unauthorized configuration changes
+- Disabled security controls (firewall, SELinux, antivirus)
+- Suspicious file permission changes (777, world-writable)
+- Unverified software installation
+- Connections to unknown external sources
+
+IMMEDIATE ACTIONS UPON DETECTION:
+1. Isolate affected systems (maintain evidence)
+2. Notify security incident response team
+3. Preserve logs and forensic evidence
+4. Begin impact assessment
+5. Do NOT make changes that destroy evidence
+
+REMEDIATION REQUIREMENTS:
+- All remediation must follow approved procedures
+- Document every action taken
+- Maintain chain of custody for evidence
+- Obtain approval before major changes
+- Validate fixes before returning systems to production
+
+NEVER DO THESE DURING INCIDENT RESPONSE:
+- Never disable additional security controls "to troubleshoot"
+- Never delete logs or evidence
+- Never skip documentation
+- Never deviate from approved procedures without authorization
+
+POST-INCIDENT:
+- Conduct root cause analysis
+- Update security controls based on lessons learned
+- Brief stakeholders
+- Archive all incident documentation
+
+Source: cve.mitre.org
