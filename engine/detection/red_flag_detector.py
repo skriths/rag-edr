@@ -3,7 +3,7 @@ Signal 2: Red Flag Detection
 
 Multi-layer keyword matching with category scoring.
 """
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 import config
 
 
@@ -22,16 +22,27 @@ class RedFlagDetector:
     def __init__(self, red_flags: Dict[str, List[str]] = None):
         self.red_flags = red_flags or config.RED_FLAGS
 
-    def score(self, content: str) -> float:
+    def score(self, content: str, metadata: Dict[str, Any] = None) -> float:
         """
         Calculate red flag score.
 
         Args:
             content: Document text
+            metadata: Document metadata (optional, used for context-aware filtering)
 
         Returns:
             Score between 0.0 (many red flags) and 1.0 (clean)
         """
+        # For golden corpus, filter out warning examples (lines with "NEVER", "WARNING:", etc.)
+        if metadata and metadata.get('category') == 'golden':
+            filtered_lines = []
+            for line in content.split('\n'):
+                line_lower = line.lower().strip()
+                # Skip lines that are warning examples (contain "never", "warning:", etc.)
+                if not any(pattern in line_lower for pattern in ['never ', 'warning:', '- never', 'do not ']):
+                    filtered_lines.append(line)
+            content = '\n'.join(filtered_lines)
+
         content_lower = content.lower()
         total_flags = 0
         categories_with_flags = 0

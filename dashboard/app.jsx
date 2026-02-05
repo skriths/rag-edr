@@ -9,6 +9,7 @@ function App() {
     const [query, setQuery] = useState('');
     const [answer, setAnswer] = useState('');
     const [loading, setLoading] = useState(false);
+    const [selectedUser, setSelectedUser] = useState('analyst-1');  // User persona
 
     // SSE connection for live events
     useEffect(() => {
@@ -53,12 +54,13 @@ function App() {
 
         setLoading(true);
         setAnswer('');
+        setCurrentSignals(null);  // Clear old integrity signals
 
         try {
             const res = await fetch(`${API_BASE}/api/query`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query, user_id: "demo-user", k: 5 })
+                body: JSON.stringify({ query, user_id: selectedUser, k: 5 })
             });
             const data = await res.json();
             setCurrentSignals(data.integrity_signals);
@@ -98,6 +100,8 @@ function App() {
                         answer={answer}
                         loading={loading}
                         onQuery={handleQuery}
+                        selectedUser={selectedUser}
+                        setSelectedUser={setSelectedUser}
                     />
                 </div>
 
@@ -182,16 +186,46 @@ const signalLabels = {
 }
 
 // Query Console Component
-function QueryConsole({ query, setQuery, answer, loading, onQuery }) {
+function QueryConsole({ query, setQuery, answer, loading, onQuery, selectedUser, setSelectedUser }) {
     const handleKeyPress = (e) => {
         if (e.key === 'Enter' && !loading) {
             onQuery();
         }
     };
 
+    const userPersonas = [
+        { id: 'analyst-1', label: 'Analyst 1' },
+        { id: 'analyst-2', label: 'Analyst 2' },
+        { id: 'soc-lead', label: 'SOC Lead' },
+        { id: 'ir-team', label: 'IR Team' },
+        { id: 'security-admin', label: 'Security Admin' }
+    ];
+
     return (
         <div className="panel">
             <div className="panel-title">Query Console</div>
+            <div style={{marginBottom: '10px'}}>
+                <label style={{fontSize: '12px', color: '#888', marginRight: '10px'}}>
+                    User Persona:
+                </label>
+                <select
+                    value={selectedUser}
+                    onChange={(e) => setSelectedUser(e.target.value)}
+                    style={{
+                        padding: '5px 10px',
+                        background: '#252525',
+                        color: '#e0e0e0',
+                        border: '1px solid #444',
+                        borderRadius: '4px',
+                        fontSize: '13px'
+                    }}
+                    disabled={loading}
+                >
+                    {userPersonas.map(user => (
+                        <option key={user.id} value={user.id}>{user.label}</option>
+                    ))}
+                </select>
+            </div>
             <input
                 type="text"
                 className="query-input"
@@ -267,6 +301,11 @@ function BlastRadiusPanel({ report }) {
                 <div style={{marginTop: '15px'}}>
                     <div><strong>Affected Queries:</strong> {report.affected_queries}</div>
                     <div><strong>Affected Users:</strong> {report.affected_users.length}</div>
+                    {report.affected_users.length > 0 && (
+                        <div style={{fontSize: '12px', color: '#e0e0e0', marginTop: '5px', marginLeft: '10px'}}>
+                            {report.affected_users.join(', ')}
+                        </div>
+                    )}
                     <div style={{fontSize: '12px', color: '#888', marginTop: '5px'}}>
                         {new Date(report.time_window_start).toLocaleString()} -
                         {new Date(report.time_window_end).toLocaleString()}

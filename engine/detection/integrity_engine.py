@@ -50,8 +50,8 @@ class IntegrityEngine:
         # Signal 1: Trust Score
         trust_score = trust_scorer.score(metadata)
 
-        # Signal 2: Red Flag Detection
-        red_flag_score = red_flag_detector.score(content)
+        # Signal 2: Red Flag Detection (context-aware for golden corpus)
+        red_flag_score = red_flag_detector.score(content, metadata)
 
         # Signal 3: Anomaly Score
         anomaly_score = anomaly_scorer.score(metadata, all_docs)
