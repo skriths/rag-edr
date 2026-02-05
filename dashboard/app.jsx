@@ -82,11 +82,93 @@ function App() {
         }
     };
 
+    const handleConfirmMalicious = async (quarantineId) => {
+        try {
+            await fetch(`${API_BASE}/api/quarantine/${quarantineId}/confirm`, {
+                method: "POST"
+            });
+            // Refresh quarantine list
+            const res = await fetch(`${API_BASE}/api/quarantine`);
+            const data = await res.json();
+            setQuarantined(data.quarantined || []);
+        } catch (error) {
+            console.error("Error confirming malicious:", error);
+        }
+    };
+
+    const handleRestore = async (quarantineId) => {
+        try {
+            await fetch(`${API_BASE}/api/quarantine/${quarantineId}/restore`, {
+                method: "POST"
+            });
+            // Refresh quarantine list
+            const res = await fetch(`${API_BASE}/api/quarantine`);
+            const data = await res.json();
+            setQuarantined(data.quarantined || []);
+        } catch (error) {
+            console.error("Error restoring document:", error);
+        }
+    };
+
+    const handleClearQuarantine = async () => {
+        if (!confirm("Clear all quarantined documents? This will restore all documents to the corpus.")) {
+            return;
+        }
+        try {
+            // Restore all quarantined documents
+            for (const q of quarantined) {
+                await fetch(`${API_BASE}/api/quarantine/${q.quarantine_id}/restore`, {
+                    method: "POST"
+                });
+            }
+            // Refresh quarantine list
+            const res = await fetch(`${API_BASE}/api/quarantine`);
+            const data = await res.json();
+            setQuarantined(data.quarantined || []);
+        } catch (error) {
+            console.error("Error clearing quarantine:", error);
+        }
+    };
+
+    const handleDemoReset = async () => {
+        if (!confirm("Reset all demo data? This will clear events, quarantine, and require re-ingestion of corpus.")) {
+            return;
+        }
+        try {
+            await fetch(`${API_BASE}/api/demo/reset`, {
+                method: "POST"
+            });
+            // Clear local state
+            setEvents([]);
+            setQuarantined([]);
+            setCurrentSignals(null);
+            setBlastRadius(null);
+            setAnswer('');
+            alert("Demo reset complete. Please run 'python3 ingest_corpus.py' to re-ingest the corpus.");
+        } catch (error) {
+            console.error("Error resetting demo:", error);
+        }
+    };
+
     return (
         <div>
             <div className="header">
                 <h1>RAG-EDR Dashboard</h1>
                 <p>Endpoint Detection & Response for RAG Systems</p>
+                <button
+                    className="btn"
+                    onClick={handleDemoReset}
+                    style={{
+                        position: 'absolute',
+                        top: '20px',
+                        right: '20px',
+                        background: '#d32f2f',
+                        fontSize: '13px',
+                        padding: '8px 15px'
+                    }}
+                >
+                    Demo Reset (Clear All)
+                </button>
             </div>
 
             <div className="container">
@@ -108,6 +190,9 @@ function App() {
                 <QuarantineVault
                     quarantined={quarantined}
                     onSelectDoc={handleBlastRadius}
+                    onConfirm={handleConfirmMalicious}
+                    onRestore={handleRestore}
+                    onClear={handleClearQuarantine}
                 />
 
                 <BlastRadiusPanel report={blastRadius} />
@@ -240,7 +325,11 @@ function QueryConsole({ query, setQuery, answer, loading, onQuery, selectedUser,
             </button>
             {answer && (
                 <div className="answer-box">
-                    {answer}
+                    {answer.split('\n').map((line, idx) => (
+                        <div key={idx} style={{marginBottom: line.trim() ? '8px' : '4px'}}>
+                            {line}
+                        </div>
+                    ))}
                 </div>
             )}
         </div>
@@ -248,10 +337,26 @@ function QueryConsole({ query, setQuery, answer, loading, onQuery, selectedUser,
 }
 
 // Quarantine Vault Component
-function QuarantineVault({ quarantined, onSelectDoc }) {
+function QuarantineVault({ quarantined, onSelectDoc, onConfirm, onRestore, onClear }) {
     return (
         <div className="panel">
-            <div className="panel-title">Quarantine Vault ({quarantined.length})</div>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                <div className="panel-title">Quarantine Vault ({quarantined.length})</div>
+                {quarantined.length > 0 && (
+                    <button
+                        className="btn"
+                        onClick={onClear}
+                        style={{
+                            fontSize: '11px',
+                            padding: '5px 10px',
+                            background: '#555',
+                            marginTop: '0'
+                        }}
+                    >
+                        Clear All
+                    </button>
+                )}
+            </div>
             {quarantined.length === 0 ? (
                 <div className="empty-state">No quarantined documents</div>
             ) : (
@@ -259,14 +364,45 @@ function QuarantineVault({ quarantined, onSelectDoc }) {
                     <div
                         key={q.quarantine_id}
                         className="quarantine-item"
-                        onClick={() => onSelectDoc(q.doc_id)}
+                        style={{cursor: 'default'}}
                     >
-                        <strong>{q.doc_id}</strong>
-                        <div style={{fontSize: '12px', color: '#888', marginTop: '5px'}}>
-                            {q.reason.substring(0, 100)}...
+                        <div onClick={() => onSelectDoc(q.doc_id)} style={{cursor: 'pointer'}}>
+                            <strong>{q.doc_id}</strong>
+                            <div style={{fontSize: '12px', color: '#888', marginTop: '5px'}}>
+                                {q.reason.substring(0, 100)}...
+                            </div>
+                            <div style={{fontSize: '11px', color: '#666', marginTop: '5px'}}>
+                                Quarantined: {new Date(q.quarantined_at).toLocaleString()}
+                            </div>
+                            <div style={{fontSize: '11px', color: '#888', marginTop: '3px'}}>
+                                State: {q.state}
+                            </div>
                         </div>
-                        <div style={{fontSize: '11px', color: '#666', marginTop: '5px'}}>
-                            Quarantined: {new Date(q.quarantined_at).toLocaleString()}
+                        <div style={{marginTop: '10px', display: 'flex', gap: '8px'}}>
+                            <button
+                                className="btn"
+                                onClick={() => onConfirm(q.quarantine_id)}
+                                style={{
+                                    fontSize: '11px',
+                                    padding: '5px 10px',
+                                    background: '#d32f2f',
+                                    flex: 1
+                                }}
+                            >
+                                Confirm Malicious
+                            </button>
+                            <button
+                                className="btn"
+                                onClick={() => onRestore(q.quarantine_id)}
+                                style={{
+                                    fontSize: '11px',
+                                    padding: '5px 10px',
+                                    background: '#2e7d32',
+                                    flex: 1
+                                }}
+                            >
+                                Restore (False Positive)
+                            </button>
                         </div>
                     </div>
                 ))

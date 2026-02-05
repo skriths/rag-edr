@@ -40,7 +40,7 @@ This document tracks what has been implemented from the original design document
 - [x] **Dashboard components** - EventLogViewer, IntegrityGauges, QuarantineVault, BlastRadiusPanel, QueryConsole
 
 ### ✅ Corpus & Scripts
-- [x] **7 corpus documents** - 3 clean CVEs, 2 poisoned CVEs, 2 golden docs
+- [x] **11 corpus documents** - 5 clean CVEs, 3 poisoned CVEs, 2 golden docs, 1 patch management procedure
 - [x] **ingest_corpus.py** - Corpus ingestion script
 - [x] **run.py** - Application entry point
 - [x] **demo.sh** - Demo orchestration script
@@ -53,10 +53,15 @@ This document tracks what has been implemented from the original design document
 ### ✅ Implemented
 - [x] **Basic quarantine workflow** - Quarantine, confirm malicious, restore
 - [x] **Event taxonomy** - Windows Event Viewer style with Event IDs
-- [x] **Multi-layer red flag detection** - 5 categories with cross-category amplification
+- [x] **Multi-layer red flag detection** - 5 categories with cross-category amplification (1.5x amplifier)
 - [x] **Blast radius analysis** - Time window, affected users, severity classification
 - [x] **Persistent storage** - ChromaDB, logs, and vault persist between runs
 - [x] **Demo reset functionality** - Clean state for demo rehearsal
+- [x] **Context-aware golden corpus filtering** - Red flag detector skips warning examples in golden docs
+- [x] **User persona tracking** - 5 user personas for blast radius analysis (analyst-1, analyst-2, soc-lead, ir-team, security-admin)
+- [x] **Quarantine management UI** - Confirm malicious, Restore, Clear all buttons
+- [x] **Answer formatting** - Line breaks and bullet rendering in dashboard
+- [x] **Demo reset button** - Single-click reset in UI (clears all state)
 
 ### ⚠️ Partially Implemented (Simplified Versions)
 - [⚠️] **Golden assertion matching**
@@ -182,8 +187,8 @@ This document tracks what has been implemented from the original design document
 ### 1. Frontend Display Semantics
 **Issue:** "Red Flag 100%" reads as "100% bad" but means "100% clean"
 **Impact:** Confusing for demo audience
-**Fix:** Rename to "Safety Score" or invert display (see SCORING_GUIDE.md)
-**Priority:** HIGH (affects demo clarity)
+**Fix:** ✅ **RESOLVED** - Renamed to "Safety Score" in dashboard UI (app.jsx line 162)
+**Priority:** ✅ **COMPLETE**
 
 ### 2. LLM Generation Timeout
 **Issue:** Mistral can be slow on CPU, causing timeouts
@@ -193,9 +198,9 @@ This document tracks what has been implemented from the original design document
 
 ### 3. Golden Corpus Detection
 **Issue:** Golden documents contain warning examples that trigger red flags
-**Impact:** security-best-practices.txt has 60% red flag score (should be 100%)
-**Fix:** Improve golden corpus parsing or use separate "examples of bad" section
-**Priority:** LOW (doesn't affect core demo)
+**Impact:** security-best-practices.txt had 60% red flag score (should be 100%)
+**Fix:** ✅ **RESOLVED** - Context-aware filtering in red_flag_detector.py now skips lines with 'never', 'warning:', '- never', 'do not' when metadata.category == 'golden'
+**Priority:** ✅ **COMPLETE**
 
 ### 4. Vector Store Reset
 **Issue:** ChromaDB persist between runs; reset requires manual deletion
@@ -317,18 +322,29 @@ This document tracks what has been implemented from the original design document
 
 ## References
 
-- **Original Design:** [RAG_EDR_Implementation_Design.md](design_docs/RAG_EDR_Implementation_Design.md) (from user's initial request)
+- **Original Design:** Plan file (from user's initial request)
 - **Scoring Guide:** [SCORING_GUIDE.md](SCORING_GUIDE.md)
 - **Setup Instructions:** [SETUP.md](SETUP.md)
-- **Quick Fix Guide:** [QUICKFIX.md](QUICKFIX.md)
+- **Query Test Guide:** [QUERY_GUIDE.md](QUERY_GUIDE.md)
+- **Red Flag Sources:** [RED_FLAGS_SOURCES.md](RED_FLAGS_SOURCES.md)
 
 ---
 
 ## Change Log
 
 - **2025-02-05:** Phase 1 implementation complete
-- **2025-02-05:** Fixed numpy array comparison bugs
-- **2025-02-05:** Adjusted red flag scoring (1.5x amplifier)
+- **2025-02-05:** Fixed numpy array comparison bugs (semantic_drift.py, vector_store.py)
+- **2025-02-05:** Adjusted red flag scoring (1.5x amplifier, aggressive cross-category penalties)
 - **2025-02-05:** Increased LLM timeout to 180s
 - **2025-02-05:** Added diagnostic script
 - **2025-02-05:** Created scoring guide and implementation status docs
+- **2025-02-05:** Added context-aware golden corpus filtering (red_flag_detector.py)
+- **2025-02-05:** Implemented user persona tracking (5 personas in app.jsx)
+- **2025-02-05:** Added quarantine management buttons (Confirm Malicious, Restore, Clear All)
+- **2025-02-05:** Added Demo Reset button in UI header
+- **2025-02-05:** Fixed answer formatting (line breaks rendering in dashboard)
+- **2025-02-05:** Renamed "Red Flag" to "Safety Score" in UI
+- **2025-02-05:** Expanded corpus to 11 documents (added CVE-2024-0006, 0007, 0008, patch-management-procedures.txt)
+- **2025-02-05:** Improved CVE-2024-0008-poisoned.txt for better semantic retrieval
+- **2025-02-05:** Created QUERY_GUIDE.md with test scenarios
+- **2025-02-05:** Created RED_FLAGS_SOURCES.md documenting industry sources (OWASP, CWE, NIST, MITRE)
