@@ -153,12 +153,13 @@ function IntegrityGauges({ signals }) {
         return 'gauge-red';
     };
 
-    const signalLabels = {
-        trust_score: 'Trust',
-        red_flag_score: 'Red Flag',
-        anomaly_score: 'Anomaly',
-        semantic_drift_score: 'Semantic'
-    };
+const signalLabels = {
+    trust_score: 'Source Trust',
+    red_flag_score: 'Safety Score',
+    anomaly_score: 'Distribution',
+    semantic_drift_score: 'Alignment'
+};
+
 
     return (
         <div className="panel">
