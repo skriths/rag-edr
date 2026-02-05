@@ -8,7 +8,9 @@ function App() {
     const [blastRadius, setBlastRadius] = useState(null);
     const [query, setQuery] = useState('');
     const [answer, setAnswer] = useState('');
+    const [unsafeAnswer, setUnsafeAnswer] = useState('');
     const [loading, setLoading] = useState(false);
+    const [unsafeLoading, setUnsafeLoading] = useState(false);
     const [selectedUser, setSelectedUser] = useState('analyst-1');  // User persona
 
     // SSE connection for live events
@@ -79,6 +81,34 @@ function App() {
             console.error("Query error:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleUnsafeQuery = async () => {
+        if (!query.trim()) return;
+
+        setUnsafeLoading(true);
+        setUnsafeAnswer('');
+
+        try {
+            const res = await fetch(`${API_BASE}/api/query/unsafe`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query, user_id: selectedUser, k: 5 })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(`HTTP ${res.status}: ${errorData.detail || "Unknown error"}`);
+            }
+
+            const data = await res.json();
+            setUnsafeAnswer(data.answer);
+        } catch (error) {
+            setUnsafeAnswer("❌ Error: " + error.message);
+            console.error("Unsafe query error:", error);
+        } finally {
+            setUnsafeLoading(false);
         }
     };
 
@@ -226,8 +256,11 @@ function App() {
                         query={query}
                         setQuery={setQuery}
                         answer={answer}
+                        unsafeAnswer={unsafeAnswer}
                         loading={loading}
+                        unsafeLoading={unsafeLoading}
                         onQuery={handleQuery}
+                        onUnsafeQuery={handleUnsafeQuery}
                         selectedUser={selectedUser}
                         setSelectedUser={setSelectedUser}
                     />
@@ -317,9 +350,9 @@ const signalLabels = {
 }
 
 // Query Console Component
-function QueryConsole({ query, setQuery, answer, loading, onQuery, selectedUser, setSelectedUser }) {
+function QueryConsole({ query, setQuery, answer, unsafeAnswer, loading, unsafeLoading, onQuery, onUnsafeQuery, selectedUser, setSelectedUser }) {
     const handleKeyPress = (e) => {
-        if (e.key === 'Enter' && !loading) {
+        if (e.key === 'Enter' && !loading && !unsafeLoading) {
             onQuery();
         }
     };
@@ -350,7 +383,7 @@ function QueryConsole({ query, setQuery, answer, loading, onQuery, selectedUser,
                         borderRadius: '4px',
                         fontSize: '13px'
                     }}
-                    disabled={loading}
+                    disabled={loading || unsafeLoading}
                 >
                     {userPersonas.map(user => (
                         <option key={user.id} value={user.id}>{user.label}</option>
@@ -364,18 +397,85 @@ function QueryConsole({ query, setQuery, answer, loading, onQuery, selectedUser,
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyPress={handleKeyPress}
-                disabled={loading}
+                disabled={loading || unsafeLoading}
             />
-            <button className="btn" onClick={onQuery} disabled={loading}>
-                {loading ? 'Processing...' : 'Execute Query'}
-            </button>
-            {answer && (
-                <div className="answer-box">
-                    {answer.split('\n').map((line, idx) => (
-                        <div key={idx} style={{marginBottom: line.trim() ? '8px' : '4px'}}>
-                            {line}
+            <div style={{display: 'flex', gap: '10px', marginTop: '10px'}}>
+                <button
+                    className="btn"
+                    onClick={onUnsafeQuery}
+                    disabled={loading || unsafeLoading}
+                    style={{
+                        background: '#ff6b6b',
+                        flex: 1
+                    }}
+                >
+                    {unsafeLoading ? 'Processing...' : '⚠️ Execute Without Protection (Demo)'}
+                </button>
+                <button
+                    className="btn"
+                    onClick={onQuery}
+                    disabled={loading || unsafeLoading}
+                    style={{
+                        background: '#2e7d32',
+                        flex: 1
+                    }}
+                >
+                    {loading ? 'Processing...' : '✓ Execute With RAG-EDR'}
+                </button>
+            </div>
+
+            {/* Side-by-side comparison */}
+            {(unsafeAnswer || answer) && (
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '20px'}}>
+                    {/* Unsafe Answer */}
+                    {unsafeAnswer && (
+                        <div>
+                            <div style={{
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                                color: '#ff6b6b',
+                                marginBottom: '8px',
+                                padding: '8px',
+                                background: 'rgba(255, 107, 107, 0.1)',
+                                borderRadius: '4px',
+                                border: '1px solid #ff6b6b'
+                            }}>
+                                ⚠️ UNPROTECTED ANSWER (Potentially Malicious)
+                            </div>
+                            <div className="answer-box" style={{border: '2px solid #ff6b6b'}}>
+                                {unsafeAnswer.split('\n').map((line, idx) => (
+                                    <div key={idx} style={{marginBottom: line.trim() ? '8px' : '4px'}}>
+                                        {line}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    ))}
+                    )}
+
+                    {/* Safe Answer */}
+                    {answer && (
+                        <div>
+                            <div style={{
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                                color: '#4caf50',
+                                marginBottom: '8px',
+                                padding: '8px',
+                                background: 'rgba(76, 175, 80, 0.1)',
+                                borderRadius: '4px',
+                                border: '1px solid #4caf50'
+                            }}>
+                                ✓ PROTECTED ANSWER (RAG-EDR Filtered)
+                            </div>
+                            <div className="answer-box" style={{border: '2px solid #4caf50'}}>
+                                {answer.split('\n').map((line, idx) => (
+                                    <div key={idx} style={{marginBottom: line.trim() ? '8px' : '4px'}}>
+                                        {line}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -489,8 +589,7 @@ function BlastRadiusPanel({ report }) {
                         </div>
                     )}
                     <div style={{fontSize: '12px', color: '#888', marginTop: '5px'}}>
-                        {new Date(report.time_window_start).toLocaleString()} -
-                        {new Date(report.time_window_end).toLocaleString()}
+                        <strong>Time Window:</strong> {new Date(report.time_window_start).toLocaleString()} → {new Date(report.time_window_end).toLocaleString()}
                     </div>
                 </div>
                 {report.recommended_actions.length > 0 && (

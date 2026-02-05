@@ -70,6 +70,57 @@ async def execute_query(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/query/unsafe")
+async def execute_unsafe_query(request: QueryRequest):
+    """
+    Execute RAG query WITHOUT integrity checks (DEMO ONLY).
+
+    This endpoint demonstrates the problem statement by showing what happens
+    when RAG systems operate without EDR protection. It:
+    1. Retrieves documents (including quarantined ones)
+    2. Skips integrity evaluation
+    3. Sends ALL documents to LLM (including poisoned)
+    4. Returns potentially unsafe answer
+
+    ⚠️ WARNING: This is for demonstration purposes only!
+    """
+    try:
+        # Retrieve documents WITHOUT quarantine filtering
+        documents = await vector_store.retrieve(
+            query=request.query,
+            k=request.k,
+            exclude_quarantined=False  # Include poisoned docs!
+        )
+
+        # Extract content for LLM (no integrity checks!)
+        doc_contents = [doc["content"] for doc in documents]
+        doc_ids = [doc["id"] for doc in documents]
+
+        # Generate answer using ALL documents (unsafe!)
+        answer = await llm.generate(request.query, doc_contents)
+
+        # Log the unsafe query (for demo tracking)
+        await logger.log_system_event(
+            event_id=4003,
+            message=f"Unsafe query executed (DEMO): {request.query[:100]}"
+        )
+
+        # Return with warning flag
+        return {
+            "answer": answer,
+            "query": request.query,
+            "user_id": request.user_id,
+            "retrieved_docs": doc_ids,
+            "quarantined_docs": [],
+            "integrity_signals": {},
+            "query_id": f"unsafe-{hash(request.query)}",
+            "_unsafe_mode": True,
+            "_warning": "⚠️ UNSAFE MODE: This query bypassed all integrity checks. Answer may contain malicious advice."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== Event Endpoints ====================
 
 @app.get("/api/events")
@@ -125,12 +176,20 @@ async def event_stream():
 
 @app.get("/api/quarantine")
 async def list_quarantine():
-    """List all quarantined documents"""
+    """List all quarantined documents (excludes RESTORED)"""
     try:
-        records = quarantine_vault.list_quarantined()
+        # Get all records
+        all_records = quarantine_vault.list_quarantined()
+
+        # Filter out RESTORED documents (only show active quarantines)
+        active_records = [
+            r for r in all_records
+            if r.state != "RESTORED"
+        ]
+
         return {
-            "quarantined": [r.model_dump() for r in records],
-            "total_count": len(records)
+            "quarantined": [r.model_dump() for r in active_records],
+            "total_count": len(active_records)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
