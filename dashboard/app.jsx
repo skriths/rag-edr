@@ -62,11 +62,21 @@ function App() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query, user_id: selectedUser, k: 5 })
             });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                if (res.status === 500 && errorData.detail && errorData.detail.includes("No documents")) {
+                    throw new Error("No documents in vector store. Please run: python3 ingest_corpus.py");
+                }
+                throw new Error(`HTTP ${res.status}: ${errorData.detail || "Unknown error"}`);
+            }
+
             const data = await res.json();
             setCurrentSignals(data.integrity_signals);
             setAnswer(data.answer);
         } catch (error) {
-            setAnswer("Error: " + error.message);
+            setAnswer("❌ Error: " + error.message);
+            console.error("Query error:", error);
         } finally {
             setLoading(false);
         }
@@ -84,29 +94,51 @@ function App() {
 
     const handleConfirmMalicious = async (quarantineId) => {
         try {
-            await fetch(`${API_BASE}/api/quarantine/${quarantineId}/confirm`, {
-                method: "POST"
+            const response = await fetch(`${API_BASE}/api/quarantine/${quarantineId}/confirm`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    analyst: selectedUser,
+                    notes: "Confirmed malicious via UI"
+                })
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
             // Refresh quarantine list
             const res = await fetch(`${API_BASE}/api/quarantine`);
             const data = await res.json();
             setQuarantined(data.quarantined || []);
         } catch (error) {
             console.error("Error confirming malicious:", error);
+            alert("Error confirming malicious: " + error.message);
         }
     };
 
     const handleRestore = async (quarantineId) => {
         try {
-            await fetch(`${API_BASE}/api/quarantine/${quarantineId}/restore`, {
-                method: "POST"
+            const response = await fetch(`${API_BASE}/api/quarantine/${quarantineId}/restore`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    analyst: selectedUser,
+                    notes: "Restored as false positive via UI"
+                })
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
             // Refresh quarantine list
             const res = await fetch(`${API_BASE}/api/quarantine`);
             const data = await res.json();
             setQuarantined(data.quarantined || []);
         } catch (error) {
             console.error("Error restoring document:", error);
+            alert("Error restoring document: " + error.message);
         }
     };
 
@@ -118,7 +150,12 @@ function App() {
             // Restore all quarantined documents
             for (const q of quarantined) {
                 await fetch(`${API_BASE}/api/quarantine/${q.quarantine_id}/restore`, {
-                    method: "POST"
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        analyst: selectedUser,
+                        notes: "Bulk restore - clearing quarantine vault"
+                    })
                 });
             }
             // Refresh quarantine list
@@ -127,26 +164,35 @@ function App() {
             setQuarantined(data.quarantined || []);
         } catch (error) {
             console.error("Error clearing quarantine:", error);
+            alert("Error clearing quarantine: " + error.message);
         }
     };
 
     const handleDemoReset = async () => {
-        if (!confirm("Reset all demo data? This will clear events, quarantine, and require re-ingestion of corpus.")) {
+        if (!confirm("⚠️ DEMO RESET WARNING ⚠️\n\nThis will:\n- Clear all events and logs\n- Clear quarantine vault\n- DELETE all documents from ChromaDB\n\nAfter reset, you MUST run:\n  python3 ingest_corpus.py\n\nContinue?")) {
             return;
         }
         try {
-            await fetch(`${API_BASE}/api/demo/reset`, {
+            const response = await fetch(`${API_BASE}/api/demo/reset`, {
                 method: "POST"
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
             // Clear local state
             setEvents([]);
             setQuarantined([]);
             setCurrentSignals(null);
             setBlastRadius(null);
             setAnswer('');
-            alert("Demo reset complete. Please run 'python3 ingest_corpus.py' to re-ingest the corpus.");
+            setQuery('');
+
+            alert("✅ Demo reset complete!\n\nNext steps:\n1. Run: python3 ingest_corpus.py\n2. Restart the server if needed\n3. Refresh this page");
         } catch (error) {
             console.error("Error resetting demo:", error);
+            alert("Error resetting demo: " + error.message);
         }
     };
 
