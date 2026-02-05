@@ -173,7 +173,7 @@ class VectorStore:
                 "doc_id": doc_id,
                 "content": results["documents"][i],
                 "metadata": results["metadatas"][i],
-                "embedding": results["embeddings"][i] if results["embeddings"] else None
+                "embedding": results["embeddings"][i] if results.get("embeddings") is not None else None
             })
 
         return docs
