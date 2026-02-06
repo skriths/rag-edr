@@ -4,14 +4,8 @@ const API_BASE = "http://localhost:8000";
 function App() {
     const [events, setEvents] = useState([]);
     const [quarantined, setQuarantined] = useState([]);
-    const [currentSignals, setCurrentSignals] = useState(null);
     const [blastRadius, setBlastRadius] = useState(null);
-    const [query, setQuery] = useState('');
-    const [answer, setAnswer] = useState('');
-    const [unsafeAnswer, setUnsafeAnswer] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [unsafeLoading, setUnsafeLoading] = useState(false);
-    const [selectedUser, setSelectedUser] = useState('analyst-1');  // User persona
+    const [selectedUser, setSelectedUser] = useState('analyst-1');
 
     // SSE connection for live events
     useEffect(() => {
@@ -51,72 +45,9 @@ function App() {
         return () => clearInterval(interval);
     }, []);
 
-    const handleQuery = async () => {
-        if (!query.trim()) return;
-
-        setLoading(true);
-        setAnswer('');
-        setCurrentSignals(null);  // Clear old integrity signals
-
-        try {
-            const res = await fetch(`${API_BASE}/api/query`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query, user_id: selectedUser, k: 5 })
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => ({}));
-                if (res.status === 500 && errorData.detail && errorData.detail.includes("No documents")) {
-                    throw new Error("No documents in vector store. Please run: python3 ingest_corpus.py");
-                }
-                throw new Error(`HTTP ${res.status}: ${errorData.detail || "Unknown error"}`);
-            }
-
-            const data = await res.json();
-            setCurrentSignals(data.integrity_signals);
-            setAnswer(data.answer);
-        } catch (error) {
-            setAnswer("❌ Error: " + error.message);
-            console.error("Query error:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleUnsafeQuery = async () => {
-        if (!query.trim()) return;
-
-        setUnsafeLoading(true);
-        setUnsafeAnswer('');
-
-        try {
-            const res = await fetch(`${API_BASE}/api/query/unsafe`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query, user_id: selectedUser, k: 5 })
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => ({}));
-                throw new Error(`HTTP ${res.status}: ${errorData.detail || "Unknown error"}`);
-            }
-
-            const data = await res.json();
-            setUnsafeAnswer(data.answer);
-        } catch (error) {
-            setUnsafeAnswer("❌ Error: " + error.message);
-            console.error("Unsafe query error:", error);
-        } finally {
-            setUnsafeLoading(false);
-        }
-    };
-
     const handleBlastRadius = async (docId) => {
         try {
-            // Set loading state (non-blocking)
             setBlastRadius({ loading: true, doc_id: docId });
-
             const res = await fetch(`${API_BASE}/api/blast-radius/${docId}`);
             const data = await res.json();
             setBlastRadius(data);
@@ -137,7 +68,7 @@ function App() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     analyst: selectedUser,
-                    notes: "Confirmed malicious via UI"
+                    notes: "Confirmed malicious via dashboard"
                 })
             });
 
@@ -145,7 +76,6 @@ function App() {
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            // Refresh quarantine list
             const res = await fetch(`${API_BASE}/api/quarantine`);
             const data = await res.json();
             setQuarantined(data.quarantined || []);
@@ -162,7 +92,7 @@ function App() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     analyst: selectedUser,
-                    notes: "Restored as false positive via UI"
+                    notes: "Restored as false positive via dashboard"
                 })
             });
 
@@ -170,7 +100,6 @@ function App() {
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            // Refresh quarantine list
             const res = await fetch(`${API_BASE}/api/quarantine`);
             const data = await res.json();
             setQuarantined(data.quarantined || []);
@@ -185,7 +114,6 @@ function App() {
             return;
         }
         try {
-            // Restore all quarantined documents
             for (const q of quarantined) {
                 await fetch(`${API_BASE}/api/quarantine/${q.quarantine_id}/restore`, {
                     method: "POST",
@@ -196,7 +124,6 @@ function App() {
                     })
                 });
             }
-            // Refresh quarantine list
             const res = await fetch(`${API_BASE}/api/quarantine`);
             const data = await res.json();
             setQuarantined(data.quarantined || []);
@@ -219,13 +146,9 @@ function App() {
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            // Clear local state
             setEvents([]);
             setQuarantined([]);
-            setCurrentSignals(null);
             setBlastRadius(null);
-            setAnswer('');
-            setQuery('');
 
             alert("✅ Demo reset complete!\n\nNext steps:\n1. Run: python3 ingest_corpus.py\n2. Restart the server if needed\n3. Refresh this page");
         } catch (error) {
@@ -237,8 +160,8 @@ function App() {
     return (
         <div>
             <div className="header">
-                <h1>RAG-EDR Dashboard</h1>
-                <p>Endpoint Detection & Response for RAG Systems</p>
+                <h1>RAG-EDR Monitoring Dashboard</h1>
+                <p>Security Operations Console</p>
                 <button
                     className="btn"
                     onClick={handleDemoReset}
@@ -255,38 +178,83 @@ function App() {
                 </button>
             </div>
 
-            <div className="container">
-                <EventLogViewer events={events} />
+            {/* Integrity Criteria Display - Top Row */}
+            <IntegrityCriteriaDisplay />
 
-                <div>
-                    <IntegrityGauges signals={currentSignals} />
-                    <QueryConsole
-                        query={query}
-                        setQuery={setQuery}
-                        answer={answer}
-                        setAnswer={setAnswer}
-                        unsafeAnswer={unsafeAnswer}
-                        setUnsafeAnswer={setUnsafeAnswer}
-                        loading={loading}
-                        unsafeLoading={unsafeLoading}
-                        onQuery={handleQuery}
-                        onUnsafeQuery={handleUnsafeQuery}
-                        selectedUser={selectedUser}
-                        setSelectedUser={setSelectedUser}
-                        currentSignals={currentSignals}
-                        setCurrentSignals={setCurrentSignals}
-                    />
+            {/* Main Content - Two Columns */}
+            <div className="dashboard-grid">
+                {/* Left Column: Event Logs */}
+                <div className="dashboard-left">
+                    <EventLogViewer events={events} />
                 </div>
 
-                <QuarantineVault
-                    quarantined={quarantined}
-                    onSelectDoc={handleBlastRadius}
-                    onConfirm={handleConfirmMalicious}
-                    onRestore={handleRestore}
-                    onClear={handleClearQuarantine}
-                />
+                {/* Right Column: Quarantine + Blast Radius */}
+                <div className="dashboard-right">
+                    <QuarantineVault
+                        quarantined={quarantined}
+                        onSelectDoc={handleBlastRadius}
+                        onConfirm={handleConfirmMalicious}
+                        onRestore={handleRestore}
+                        onClear={handleClearQuarantine}
+                    />
+                    <BlastRadiusPanel report={blastRadius} />
+                </div>
+            </div>
+        </div>
+    );
+}
 
-                <BlastRadiusPanel report={blastRadius} />
+// Integrity Criteria Display - Shows thresholds and detection logic
+function IntegrityCriteriaDisplay() {
+    const criteria = [
+        {
+            icon: '🏢',
+            name: 'Trust Score',
+            description: 'Source Reputation',
+            threshold: '>50%',
+            checks: 'Domain verification against trusted sources list'
+        },
+        {
+            icon: '🚩',
+            name: 'Red Flag Detection',
+            description: 'Malicious Patterns',
+            threshold: '>50%',
+            checks: '5 categories: security downgrade, dangerous permissions, severity downplay, unsafe operations, social engineering'
+        },
+        {
+            icon: '📊',
+            name: 'Anomaly Score',
+            description: 'Source Diversity',
+            threshold: '>50%',
+            checks: 'Distribution analysis across retrieval sources'
+        },
+        {
+            icon: '🎯',
+            name: 'Alignment Score',
+            description: 'Semantic Drift',
+            threshold: '>50%',
+            checks: 'Embedding similarity to golden corpus baseline'
+        }
+    ];
+
+    return (
+        <div className="integrity-criteria-container">
+            <div className="integrity-criteria-header">
+                <h2>Integrity Detection Engine</h2>
+                <div className="trigger-rule">
+                    Trigger Rule: <strong>2 of 4 signals below 50%</strong> → Quarantine
+                </div>
+            </div>
+            <div className="criteria-grid">
+                {criteria.map((criterion, idx) => (
+                    <div key={idx} className="criteria-card">
+                        <div className="criteria-icon">{criterion.icon}</div>
+                        <div className="criteria-name">{criterion.name}</div>
+                        <div className="criteria-description">{criterion.description}</div>
+                        <div className="criteria-threshold">Threshold: {criterion.threshold}</div>
+                        <div className="criteria-checks">{criterion.checks}</div>
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -296,221 +264,19 @@ function App() {
 function EventLogViewer({ events }) {
     return (
         <div className="panel event-log">
-            <div className="panel-title">Event Log</div>
+            <div className="panel-title">Event Log (Live Stream)</div>
             {events.length === 0 ? (
-                <div className="empty-state">No events yet. Execute a query to start.</div>
+                <div className="empty-state">No events yet. Waiting for activity...</div>
             ) : (
-                events.map((event, idx) => (
-                    <div key={idx} className={`event-item event-${event.level.toLowerCase()}`}>
-                        <strong>[{event.event_id}]</strong> {event.message}
-                        <div className="event-timestamp">
-                            {new Date(event.timestamp).toLocaleString()}
-                        </div>
-                    </div>
-                ))
-            )}
-        </div>
-    );
-}
-
-// Integrity Gauges Component
-function IntegrityGauges({ signals }) {
-    if (!signals || Object.keys(signals).length === 0) {
-        return (
-            <div className="panel">
-                <div className="panel-title">Integrity Signals</div>
-                <div className="empty-state">Execute a query to see integrity scores</div>
-            </div>
-        );
-    }
-
-    // Extract first doc's signals (for demo)
-    const firstDocSignals = Object.values(signals)[0] || {};
-
-    const getGaugeClass = (score) => {
-        if (score >= 0.7) return 'gauge-green';
-        if (score >= 0.5) return 'gauge-yellow';
-        return 'gauge-red';
-    };
-
-const signalLabels = {
-    trust_score: 'Source Trust',
-    red_flag_score: 'Safety Score',
-    anomaly_score: 'Distribution',
-    semantic_drift_score: 'Alignment'
-};
-
-
-    return (
-        <div className="panel">
-            <div className="panel-title">Integrity Signals</div>
-            <div className="gauge-container">
-                {Object.entries(signalLabels).map(([key, label]) => {
-                    const score = firstDocSignals[key] || 0;
-                    return (
-                        <div key={key} className="gauge">
-                            <div className="gauge-label">{label}</div>
-                            <div className={`gauge-value ${getGaugeClass(score)}`}>
-                                {(score * 100).toFixed(0)}%
+                <div style={{maxHeight: '600px', overflowY: 'auto'}}>
+                    {events.map((event, idx) => (
+                        <div key={idx} className={`event-item event-${event.level.toLowerCase()}`}>
+                            <strong>[{event.event_id}]</strong> {event.message}
+                            <div className="event-timestamp">
+                                {new Date(event.timestamp).toLocaleString()}
                             </div>
                         </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-// Query Console Component
-function QueryConsole({ query, setQuery, answer, setAnswer, unsafeAnswer, setUnsafeAnswer, loading, unsafeLoading, onQuery, onUnsafeQuery, selectedUser, setSelectedUser, currentSignals, setCurrentSignals }) {
-    const handleKeyPress = (e) => {
-        if (e.key === 'Enter' && !loading && !unsafeLoading) {
-            onQuery();
-        }
-    };
-
-    const userPersonas = [
-        { id: 'analyst-1', label: 'Analyst 1' },
-        { id: 'analyst-2', label: 'Analyst 2' },
-        { id: 'soc-lead', label: 'SOC Lead' },
-        { id: 'ir-team', label: 'IR Team' },
-        { id: 'security-admin', label: 'Security Admin' }
-    ];
-
-    return (
-        <div className="panel">
-            <div className="panel-title">Query Console</div>
-            <div style={{marginBottom: '10px'}}>
-                <label style={{fontSize: '12px', color: '#888', marginRight: '10px'}}>
-                    User Persona:
-                </label>
-                <select
-                    value={selectedUser}
-                    onChange={(e) => setSelectedUser(e.target.value)}
-                    style={{
-                        padding: '5px 10px',
-                        background: '#252525',
-                        color: '#e0e0e0',
-                        border: '1px solid #444',
-                        borderRadius: '4px',
-                        fontSize: '13px'
-                    }}
-                    disabled={loading || unsafeLoading}
-                >
-                    {userPersonas.map(user => (
-                        <option key={user.id} value={user.id}>{user.label}</option>
                     ))}
-                </select>
-            </div>
-            <input
-                type="text"
-                className="query-input"
-                placeholder="Enter security query... (e.g., How do I patch CVE-2024-0001?)"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyPress={handleKeyPress}
-                disabled={loading || unsafeLoading}
-            />
-            <div style={{display: 'flex', gap: '10px', marginTop: '10px'}}>
-                <button
-                    className="btn"
-                    onClick={onUnsafeQuery}
-                    disabled={loading || unsafeLoading}
-                    style={{
-                        background: '#d32f2f',
-                        flex: 2
-                    }}
-                >
-                    {unsafeLoading ? 'Processing...' : '⚠️ Execute Without Protection (Demo)'}
-                </button>
-                <button
-                    className="btn"
-                    onClick={onQuery}
-                    disabled={loading || unsafeLoading}
-                    style={{
-                        background: '#2e7d32',
-                        flex: 2
-                    }}
-                >
-                    {loading ? 'Processing...' : '✓ Execute With RAG-EDR'}
-                </button>
-                {(answer || unsafeAnswer) && (
-                    <button
-                        className="btn"
-                        onClick={() => {
-                            setQuery('');
-                            setAnswer('');
-                            setUnsafeAnswer('');
-                            setCurrentSignals(null);
-                        }}
-                        disabled={loading || unsafeLoading}
-                        style={{
-                            background: '#555',
-                            flex: 1
-                        }}
-                    >
-                        Clear
-                    </button>
-                )}
-            </div>
-
-            {/* Answer Display: Full-width or Side-by-side comparison */}
-            {(unsafeAnswer || answer) && (
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: (unsafeAnswer && answer) ? '1fr 1fr' : '1fr',
-                    gap: '15px',
-                    marginTop: '20px'
-                }}>
-                    {/* Unsafe Answer */}
-                    {unsafeAnswer && (
-                        <div>
-                            <div style={{
-                                fontSize: '13px',
-                                fontWeight: 'bold',
-                                color: '#d32f2f',
-                                marginBottom: '8px',
-                                padding: '8px',
-                                background: 'rgba(211, 47, 47, 0.1)',
-                                borderRadius: '4px',
-                                border: '1px solid #d32f2f'
-                            }}>
-                                ⚠️ UNPROTECTED ANSWER (Potentially Malicious)
-                            </div>
-                            <div className="answer-box" style={{border: '2px solid #d32f2f'}}>
-                                {unsafeAnswer.split('\n').map((line, idx) => (
-                                    <div key={idx} style={{marginBottom: line.trim() ? '8px' : '4px'}}>
-                                        {line}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Safe Answer */}
-                    {answer && (
-                        <div>
-                            <div style={{
-                                fontSize: '13px',
-                                fontWeight: 'bold',
-                                color: '#4caf50',
-                                marginBottom: '8px',
-                                padding: '8px',
-                                background: 'rgba(76, 175, 80, 0.1)',
-                                borderRadius: '4px',
-                                border: '1px solid #4caf50'
-                            }}>
-                                ✓ PROTECTED ANSWER (RAG-EDR Filtered)
-                            </div>
-                            <div className="answer-box" style={{border: '2px solid #4caf50'}}>
-                                {answer.split('\n').map((line, idx) => (
-                                    <div key={idx} style={{marginBottom: line.trim() ? '8px' : '4px'}}>
-                                        {line}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
         </div>
@@ -541,52 +307,54 @@ function QuarantineVault({ quarantined, onSelectDoc, onConfirm, onRestore, onCle
             {quarantined.length === 0 ? (
                 <div className="empty-state">No quarantined documents</div>
             ) : (
-                quarantined.map(q => (
-                    <div
-                        key={q.quarantine_id}
-                        className="quarantine-item"
-                        style={{cursor: 'default'}}
-                    >
-                        <div onClick={() => onSelectDoc(q.doc_id)} style={{cursor: 'pointer'}}>
-                            <strong>{q.doc_id}</strong>
-                            <div style={{fontSize: '12px', color: '#888', marginTop: '5px'}}>
-                                {q.reason.substring(0, 100)}...
+                <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+                    {quarantined.map(q => (
+                        <div
+                            key={q.quarantine_id}
+                            className="quarantine-item"
+                            style={{cursor: 'default'}}
+                        >
+                            <div onClick={() => onSelectDoc(q.doc_id)} style={{cursor: 'pointer'}}>
+                                <strong>{q.doc_id}</strong>
+                                <div style={{fontSize: '12px', color: '#888', marginTop: '5px'}}>
+                                    {q.reason.substring(0, 100)}...
+                                </div>
+                                <div style={{fontSize: '11px', color: '#666', marginTop: '5px'}}>
+                                    Quarantined: {new Date(q.quarantined_at).toLocaleString()}
+                                </div>
+                                <div style={{fontSize: '11px', color: '#888', marginTop: '3px'}}>
+                                    State: {q.state}
+                                </div>
                             </div>
-                            <div style={{fontSize: '11px', color: '#666', marginTop: '5px'}}>
-                                Quarantined: {new Date(q.quarantined_at).toLocaleString()}
-                            </div>
-                            <div style={{fontSize: '11px', color: '#888', marginTop: '3px'}}>
-                                State: {q.state}
+                            <div style={{marginTop: '10px', display: 'flex', gap: '8px'}}>
+                                <button
+                                    className="btn"
+                                    onClick={() => onConfirm(q.quarantine_id)}
+                                    style={{
+                                        fontSize: '11px',
+                                        padding: '5px 10px',
+                                        background: '#d32f2f',
+                                        flex: 1
+                                    }}
+                                >
+                                    Confirm Malicious
+                                </button>
+                                <button
+                                    className="btn"
+                                    onClick={() => onRestore(q.quarantine_id)}
+                                    style={{
+                                        fontSize: '11px',
+                                        padding: '5px 10px',
+                                        background: '#2e7d32',
+                                        flex: 1
+                                    }}
+                                >
+                                    Restore (False Positive)
+                                </button>
                             </div>
                         </div>
-                        <div style={{marginTop: '10px', display: 'flex', gap: '8px'}}>
-                            <button
-                                className="btn"
-                                onClick={() => onConfirm(q.quarantine_id)}
-                                style={{
-                                    fontSize: '11px',
-                                    padding: '5px 10px',
-                                    background: '#d32f2f',
-                                    flex: 1
-                                }}
-                            >
-                                Confirm Malicious
-                            </button>
-                            <button
-                                className="btn"
-                                onClick={() => onRestore(q.quarantine_id)}
-                                style={{
-                                    fontSize: '11px',
-                                    padding: '5px 10px',
-                                    background: '#2e7d32',
-                                    flex: 1
-                                }}
-                            >
-                                Restore (False Positive)
-                            </button>
-                        </div>
-                    </div>
-                ))
+                    ))}
+                </div>
             )}
         </div>
     );
@@ -603,7 +371,6 @@ function BlastRadiusPanel({ report }) {
         );
     }
 
-    // Loading state
     if (report.loading) {
         return (
             <div className="panel">
@@ -613,7 +380,6 @@ function BlastRadiusPanel({ report }) {
         );
     }
 
-    // Error state
     if (report.error) {
         return (
             <div className="panel">

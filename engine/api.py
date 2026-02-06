@@ -388,6 +388,7 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "docs": "/docs",
+            "query_app": "/query/index.html",
             "dashboard": "/dashboard/index.html"
         }
     }
@@ -426,4 +427,11 @@ try:
     app.mount("/dashboard", StaticFiles(directory="dashboard", html=True), name="dashboard")
 except RuntimeError:
     # Dashboard directory doesn't exist yet - will be created later
+    pass
+
+# Serve query app static files
+try:
+    app.mount("/query", StaticFiles(directory="query", html=True), name="query")
+except RuntimeError:
+    # Query directory doesn't exist yet - will be created later
     pass
