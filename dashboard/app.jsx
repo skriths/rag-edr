@@ -602,7 +602,12 @@ function BlastRadiusPanel({ report }) {
                 <div>
                     <strong>Document:</strong> {report.doc_id}
                 </div>
-                <div>
+                {report.file_path && (
+                    <div style={{fontSize: '11px', color: '#888', marginTop: '3px', fontFamily: 'monospace'}}>
+                        {report.file_path}
+                    </div>
+                )}
+                <div style={{marginTop: '8px'}}>
                     <span className={`severity-badge severity-${report.severity}`}>
                         {report.severity}
                     </span>

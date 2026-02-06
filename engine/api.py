@@ -214,6 +214,13 @@ async def get_quarantine_detail(quarantine_id: str):
 async def confirm_malicious(quarantine_id: str, action: AnalystAction):
     """Analyst confirms document is malicious"""
     try:
+        # Get the actual doc_id before confirming
+        record = quarantine_vault.get_record(quarantine_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="Quarantine record not found")
+
+        doc_id = record.doc_id
+
         await quarantine_vault.confirm_malicious(
             quarantine_id=quarantine_id,
             analyst=action.analyst,
@@ -222,7 +229,7 @@ async def confirm_malicious(quarantine_id: str, action: AnalystAction):
 
         await logger.log_quarantine_action(
             quarantine_id=quarantine_id,
-            doc_id=quarantine_id.split("-")[-1],  # Extract doc_id
+            doc_id=doc_id,
             reason=action.notes,
             action="confirmed",
             analyst=action.analyst
@@ -239,6 +246,13 @@ async def confirm_malicious(quarantine_id: str, action: AnalystAction):
 async def restore_document(quarantine_id: str, action: AnalystAction):
     """Analyst restores document as false positive"""
     try:
+        # Get the actual doc_id before restoring
+        record = quarantine_vault.get_record(quarantine_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="Quarantine record not found")
+
+        doc_id = record.doc_id
+
         await quarantine_vault.restore_document(
             quarantine_id=quarantine_id,
             analyst=action.analyst,
@@ -247,7 +261,7 @@ async def restore_document(quarantine_id: str, action: AnalystAction):
 
         await logger.log_quarantine_action(
             quarantine_id=quarantine_id,
-            doc_id=quarantine_id.split("-")[-1],
+            doc_id=doc_id,
             reason=action.notes,
             action="restored",
             analyst=action.analyst

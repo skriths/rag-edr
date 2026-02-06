@@ -99,7 +99,8 @@ class VectorStore:
                 continue
 
             documents.append({
-                "doc_id": doc_id,
+                "id": doc_id,  # Use 'id' for consistency
+                "doc_id": doc_id,  # Keep for backwards compatibility
                 "content": results["documents"][0][i],
                 "metadata": metadata,
                 "distance": results["distances"][0][i],

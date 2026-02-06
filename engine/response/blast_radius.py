@@ -116,8 +116,17 @@ class BlastRadiusAnalyzer:
             doc_id
         )
 
+        # Get file path from quarantine vault
+        from engine.response.quarantine_vault import quarantine_vault
+        file_path = None
+        for q_dir in config.VAULT_DIR.glob(f"*-{doc_id}"):
+            if q_dir.is_dir():
+                file_path = str(q_dir / "content.txt")
+                break
+
         return BlastRadiusReport(
             doc_id=doc_id,
+            file_path=file_path,
             affected_queries=len(affected_queries),
             affected_users=affected_users,
             time_window_start=earliest_time if affected_queries else datetime.utcnow(),

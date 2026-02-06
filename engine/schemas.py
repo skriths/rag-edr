@@ -180,6 +180,7 @@ class BlastRadiusReport(BaseModel):
     Shows how many users and queries were affected by a poisoned document.
     """
     doc_id: str
+    file_path: Optional[str] = None  # Path to quarantined file
     affected_queries: int
     affected_users: Set[str]
     time_window_start: datetime
