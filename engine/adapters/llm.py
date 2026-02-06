@@ -30,7 +30,7 @@ class LLMAdapter:
 
         Args:
             query: User query
-            context_docs: Retrieved documents (list of dicts with 'content' key)
+            context_docs: Retrieved documents (list of dicts with 'content' key, or list of strings)
             fallback_message: If no clean docs available, return this
 
         Returns:
@@ -39,11 +39,16 @@ class LLMAdapter:
         if not context_docs:
             return fallback_message or "No information available to answer this query."
 
-        # Build context prompt
-        context = "\n\n".join([
-            f"Document {i+1}:\n{doc['content']}"
-            for i, doc in enumerate(context_docs)
-        ])
+        # Build context prompt - handle both dict format and string format
+        context_parts = []
+        for i, doc in enumerate(context_docs):
+            if isinstance(doc, dict):
+                content = doc.get('content', str(doc))
+            else:
+                content = str(doc)
+            context_parts.append(f"Document {i+1}:\n{content}")
+
+        context = "\n\n".join(context_parts)
 
         prompt = f"""You are a security analyst assistant. Answer the following question using ONLY the provided context documents. Be concise and accurate.
 
