@@ -256,13 +256,17 @@ function App() {
                         query={query}
                         setQuery={setQuery}
                         answer={answer}
+                        setAnswer={setAnswer}
                         unsafeAnswer={unsafeAnswer}
+                        setUnsafeAnswer={setUnsafeAnswer}
                         loading={loading}
                         unsafeLoading={unsafeLoading}
                         onQuery={handleQuery}
                         onUnsafeQuery={handleUnsafeQuery}
                         selectedUser={selectedUser}
                         setSelectedUser={setSelectedUser}
+                        currentSignals={currentSignals}
+                        setCurrentSignals={setCurrentSignals}
                     />
                 </div>
 
@@ -350,7 +354,7 @@ const signalLabels = {
 }
 
 // Query Console Component
-function QueryConsole({ query, setQuery, answer, unsafeAnswer, loading, unsafeLoading, onQuery, onUnsafeQuery, selectedUser, setSelectedUser }) {
+function QueryConsole({ query, setQuery, answer, setAnswer, unsafeAnswer, setUnsafeAnswer, loading, unsafeLoading, onQuery, onUnsafeQuery, selectedUser, setSelectedUser, currentSignals, setCurrentSignals }) {
     const handleKeyPress = (e) => {
         if (e.key === 'Enter' && !loading && !unsafeLoading) {
             onQuery();
@@ -405,8 +409,8 @@ function QueryConsole({ query, setQuery, answer, unsafeAnswer, loading, unsafeLo
                     onClick={onUnsafeQuery}
                     disabled={loading || unsafeLoading}
                     style={{
-                        background: '#ff6b6b',
-                        flex: 1
+                        background: '#d32f2f',
+                        flex: 2
                     }}
                 >
                     {unsafeLoading ? 'Processing...' : '⚠️ Execute Without Protection (Demo)'}
@@ -417,32 +421,55 @@ function QueryConsole({ query, setQuery, answer, unsafeAnswer, loading, unsafeLo
                     disabled={loading || unsafeLoading}
                     style={{
                         background: '#2e7d32',
-                        flex: 1
+                        flex: 2
                     }}
                 >
                     {loading ? 'Processing...' : '✓ Execute With RAG-EDR'}
                 </button>
+                {(answer || unsafeAnswer) && (
+                    <button
+                        className="btn"
+                        onClick={() => {
+                            setQuery('');
+                            setAnswer('');
+                            setUnsafeAnswer('');
+                            setCurrentSignals(null);
+                        }}
+                        disabled={loading || unsafeLoading}
+                        style={{
+                            background: '#555',
+                            flex: 1
+                        }}
+                    >
+                        Clear
+                    </button>
+                )}
             </div>
 
-            {/* Side-by-side comparison */}
+            {/* Answer Display: Full-width or Side-by-side comparison */}
             {(unsafeAnswer || answer) && (
-                <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '20px'}}>
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: (unsafeAnswer && answer) ? '1fr 1fr' : '1fr',
+                    gap: '15px',
+                    marginTop: '20px'
+                }}>
                     {/* Unsafe Answer */}
                     {unsafeAnswer && (
                         <div>
                             <div style={{
                                 fontSize: '13px',
                                 fontWeight: 'bold',
-                                color: '#ff6b6b',
+                                color: '#d32f2f',
                                 marginBottom: '8px',
                                 padding: '8px',
-                                background: 'rgba(255, 107, 107, 0.1)',
+                                background: 'rgba(211, 47, 47, 0.1)',
                                 borderRadius: '4px',
-                                border: '1px solid #ff6b6b'
+                                border: '1px solid #d32f2f'
                             }}>
                                 ⚠️ UNPROTECTED ANSWER (Potentially Malicious)
                             </div>
-                            <div className="answer-box" style={{border: '2px solid #ff6b6b'}}>
+                            <div className="answer-box" style={{border: '2px solid #d32f2f'}}>
                                 {unsafeAnswer.split('\n').map((line, idx) => (
                                     <div key={idx} style={{marginBottom: line.trim() ? '8px' : '4px'}}>
                                         {line}
@@ -602,6 +629,26 @@ function BlastRadiusPanel({ report }) {
                                 </li>
                             ))}
                         </ul>
+                    </div>
+                )}
+                {report.query_details && report.query_details.length > 0 && (
+                    <div style={{marginTop: '15px'}}>
+                        <strong>Query Lineage Log:</strong>
+                        <div style={{marginTop: '8px', maxHeight: '200px', overflowY: 'auto', background: '#1a1a1a', padding: '10px', borderRadius: '4px', border: '1px solid #333'}}>
+                            {report.query_details.map((query, idx) => (
+                                <div key={idx} style={{marginBottom: '10px', paddingBottom: '10px', borderBottom: idx < report.query_details.length - 1 ? '1px solid #333' : 'none'}}>
+                                    <div style={{fontSize: '11px', color: '#888'}}>
+                                        {new Date(query.timestamp).toLocaleString()} • <span style={{color: '#4caf50'}}>{query.user_id}</span>
+                                    </div>
+                                    <div style={{fontSize: '12px', color: '#e0e0e0', marginTop: '3px'}}>
+                                        "{query.query_text}"
+                                    </div>
+                                    <div style={{fontSize: '11px', color: '#ff9800', marginTop: '2px'}}>
+                                        Action: {query.action_taken}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
