@@ -1,5 +1,7 @@
 """
 RAG-EDR Pipeline: Orchestrates retrieval, integrity checks, and generation.
+
+Phase 1 Enhancement: Query preprocessing with CVE ID extraction and augmentation.
 """
 from typing import List, Dict, Any
 from uuid import uuid4
@@ -10,6 +12,7 @@ from engine.response.quarantine_vault import quarantine_vault
 from engine.response.blast_radius import blast_radius_analyzer
 from engine.logging.event_logger import logger
 from engine.schemas import Event, EventLevel, EventCategory
+from engine.utils.query_processor import QueryProcessor
 import config
 
 
@@ -18,7 +21,8 @@ class RAGPipeline:
     End-to-end RAG pipeline with integrity checks and quarantine filtering.
 
     Flow:
-    1. Retrieve documents from vector store (exclude quarantined)
+    0. Preprocess query (Phase 1: extract CVE IDs, augment query)
+    1. Retrieve documents from vector store (exclude quarantined, with metadata filter)
     2. Run integrity checks on retrieved docs
     3. Quarantine suspicious docs
     4. If clean docs remain, generate answer
@@ -35,6 +39,8 @@ class RAGPipeline:
         """
         Execute RAG query with EDR protection.
 
+        Phase 1: Includes query preprocessing for exact CVE ID matching.
+
         Args:
             query_text: User question
             user_id: User identifier (for lineage tracking)
@@ -50,8 +56,16 @@ class RAGPipeline:
         """
         query_id = str(uuid4())
 
-        # Step 1: Retrieve documents (exclude quarantined)
-        retrieved = await vector_store.retrieve(query_text, k=k, exclude_quarantined=True)
+        # Step 0: Phase 1 - Preprocess query (extract CVE IDs, augment for better matching)
+        augmented_query, metadata_filter = QueryProcessor.process_query(query_text)
+
+        # Step 1: Retrieve documents with preprocessing
+        retrieved = await vector_store.retrieve(
+            augmented_query,
+            k=k,
+            exclude_quarantined=True,
+            metadata_filter=metadata_filter
+        )
 
         if not retrieved:
             await logger.log_system_event(

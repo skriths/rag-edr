@@ -2,12 +2,15 @@
 ChromaDB adapter for RAG-EDR.
 
 Handles document ingestion, retrieval, and quarantine filtering.
+
+Phase 1 Enhancement: Metadata-enriched retrieval with CVE ID filtering.
 """
 import chromadb
 from chromadb.config import Settings
 from typing import List, Dict, Any, Optional
 from sentence_transformers import SentenceTransformer
 import config
+from engine.utils.entity_extractor import EntityExtractor
 
 
 class VectorStore:
@@ -20,6 +23,7 @@ class VectorStore:
     - is_quarantined: Boolean flag
     - quarantine_id: If quarantined, reference to vault
     - category: clean/poisoned/golden
+    - cve_ids: List of CVE IDs found in document (Phase 1)
     """
 
     def __init__(self):
@@ -38,15 +42,22 @@ class VectorStore:
 
     async def ingest_document(self, doc_id: str, content: str, metadata: Dict[str, Any]) -> None:
         """
-        Add document to vector store.
+        Add document to vector store with enriched metadata.
+
+        Phase 1: Automatically extracts CVE IDs from content and stores in metadata.
 
         Args:
             doc_id: Unique identifier
             content: Full text content
             metadata: Must include 'source', optionally 'is_quarantined'
         """
+        # Existing metadata defaults
         metadata.setdefault("is_quarantined", False)
         metadata.setdefault("quarantine_id", "")
+
+        # Phase 1: Extract and store CVE IDs from content
+        entities = EntityExtractor.extract_entities(content)
+        metadata.setdefault("cve_ids", entities["cve_ids"])
 
         # Generate embedding
         embedding = self.embedding_model.encode(content).tolist()
@@ -63,29 +74,49 @@ class VectorStore:
         self,
         query: str,
         k: int = 5,
-        exclude_quarantined: bool = True
+        exclude_quarantined: bool = True,
+        metadata_filter: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Retrieve documents for query.
+        Retrieve documents for query with optional metadata filtering.
+
+        Phase 1: Supports ChromaDB WHERE filters for exact CVE ID matching.
 
         Args:
             query: Search query
             k: Number of results
             exclude_quarantined: Filter out quarantined docs
+            metadata_filter: Optional ChromaDB WHERE clause (e.g., {"cve_ids": {"$contains": "CVE-2024-0004"}})
 
         Returns:
             List of dicts with keys: doc_id, content, metadata, distance, embedding
+
+        Example:
+            # Exact CVE ID match
+            results = await retrieve(
+                "How to fix CVE-2024-0004?",
+                metadata_filter={"cve_ids": {"$contains": "CVE-2024-0004"}}
+            )
         """
         # Generate query embedding
         query_embedding = self.embedding_model.encode(query).tolist()
 
         # Query ChromaDB (over-fetch if we need to filter)
         n_results = k * 3 if exclude_quarantined else k
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=min(n_results, self.collection.count()),
-            include=["documents", "metadatas", "distances", "embeddings"]
-        )
+
+        # Build query parameters
+        query_params = {
+            "query_embeddings": [query_embedding],
+            "n_results": min(n_results, self.collection.count()),
+            "include": ["documents", "metadatas", "distances", "embeddings"]
+        }
+
+        # Phase 1: Add metadata filter if provided
+        if metadata_filter:
+            query_params["where"] = metadata_filter
+
+        # Execute query
+        results = self.collection.query(**query_params)
 
         if not results["ids"] or not results["ids"][0]:
             return []

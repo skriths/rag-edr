@@ -82,14 +82,24 @@ async def execute_unsafe_query(request: QueryRequest):
     3. Sends ALL documents to LLM (including poisoned)
     4. Returns potentially unsafe answer
 
+    Phase 1: Uses query preprocessing to ensure correct document retrieval,
+    but skips integrity checks (allows poisoned docs through).
+
     ⚠️ WARNING: This is for demonstration purposes only!
     """
     try:
+        # Phase 1: Import query processor
+        from engine.utils.query_processor import QueryProcessor
+
+        # Preprocess query (same as protected mode)
+        augmented_query, metadata_filter = QueryProcessor.process_query(request.query)
+
         # Retrieve documents WITHOUT quarantine filtering
         documents = await vector_store.retrieve(
-            query=request.query,
+            query=augmented_query,
             k=request.k,
-            exclude_quarantined=False  # Include poisoned docs!
+            exclude_quarantined=False,  # Include poisoned docs!
+            metadata_filter=metadata_filter  # Phase 1: Use exact matching
         )
 
         # Check if we got valid documents
