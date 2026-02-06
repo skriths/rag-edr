@@ -54,7 +54,7 @@ This document tracks what has been implemented from the original design document
 - [x] **Basic quarantine workflow** - Quarantine, confirm malicious, restore
 - [x] **Event taxonomy** - Windows Event Viewer style with Event IDs
 - [x] **Multi-layer red flag detection** - 5 categories with cross-category amplification (1.5x amplifier)
-- [x] **Blast radius analysis** - Time window, affected users, severity classification
+- [x] **Blast radius analysis** - Time window, affected users, severity classification, query lineage log
 - [x] **Persistent storage** - ChromaDB, logs, and vault persist between runs
 - [x] **Demo reset functionality** - Clean state for demo rehearsal
 - [x] **Context-aware golden corpus filtering** - Red flag detector skips warning examples in golden docs
@@ -62,6 +62,13 @@ This document tracks what has been implemented from the original design document
 - [x] **Quarantine management UI** - Confirm malicious, Restore, Clear all buttons
 - [x] **Answer formatting** - Line breaks and bullet rendering in dashboard
 - [x] **Demo reset button** - Single-click reset in UI (clears all state)
+- [x] **Unsafe query endpoint** - Demonstrates problem statement by bypassing all integrity checks
+- [x] **Side-by-side comparison UI** - Shows unsafe vs. protected answers for dramatic demo effect
+- [x] **Async blast radius loading** - Non-blocking UI with loading states
+- [x] **File path display in blast radius** - Shows quarantine directory for manual false positive investigation
+- [x] **Clear button** - Resets query and answers for clean demo flow
+- [x] **Event logging improvements** - Shows full document names instead of quarantine IDs
+- [x] **Attack window clarification** - Renamed "Time Window" to "Attack Window" with explanation
 
 ### ⚠️ Partially Implemented (Simplified Versions)
 - [⚠️] **Golden assertion matching**
@@ -214,6 +221,52 @@ This document tracks what has been implemented from the original design document
 **Fix:** Add batch scanning endpoint
 **Priority:** LOW (out of hackathon scope)
 
+### 6. False Positive Learning
+**Issue:** When analyst restores a document as false positive, system doesn't learn from it
+**Impact:** Same document may get quarantined again on next query
+**Status:** ⚠️ **KNOWN BEHAVIOR** - System is stateless by design
+**Current Behavior:**
+- Document restored → `is_quarantined=False` in ChromaDB
+- Next query → Document retrieved again
+- Integrity checks run fresh (stateless)
+- If still has red flags → Quarantined again
+- **This is intentional:** Demonstrates persistent protection
+
+**Future Enhancement (Phase 3):**
+Add **trust boosting** for restored documents:
+```python
+# config.py
+FALSE_POSITIVE_TRUST_BOOST = 0.2  # +20% to all signal scores
+
+# integrity_engine.py
+if metadata.get("restored_count", 0) > 0:
+    # Apply trust boost
+    trust_score = min(1.0, trust_score + FALSE_POSITIVE_TRUST_BOOST)
+    red_flag_score = min(1.0, red_flag_score + FALSE_POSITIVE_TRUST_BOOST)
+    anomaly_score = min(1.0, anomaly_score + FALSE_POSITIVE_TRUST_BOOST)
+    semantic_drift_score = min(1.0, semantic_drift_score + FALSE_POSITIVE_TRUST_BOOST)
+```
+
+**Implementation Details:**
+1. When document restored, increment `metadata.restored_count`
+2. On next retrieval, check `restored_count`
+3. If > 0, apply trust boost to all signals
+4. Trust boost is cumulative: 1 restore = +20%, 2 restores = +40%
+5. Max boost = +50% (prevents auto-pass for truly malicious docs)
+
+**Benefits:**
+- ✅ Reduces re-quarantine of false positives
+- ✅ Learns from analyst feedback
+- ✅ Still maintains protection (boost is capped)
+- ✅ Preserves stateless architecture (boost stored in metadata)
+
+**Trade-offs:**
+- ⚠️ Attacker could restore malicious doc to boost trust
+- ⚠️ Requires RBAC to prevent unauthorized restores
+- ⚠️ Need audit trail of who restored and why
+
+**Priority:** LOW (Phase 3 - requires RBAC first)
+
 ---
 
 ## What's Production-Ready vs. Prototype
@@ -348,3 +401,19 @@ This document tracks what has been implemented from the original design document
 - **2025-02-05:** Improved CVE-2024-0008-poisoned.txt for better semantic retrieval
 - **2025-02-05:** Created QUERY_GUIDE.md with test scenarios
 - **2025-02-05:** Created RED_FLAGS_SOURCES.md documenting industry sources (OWASP, CWE, NIST, MITRE)
+- **2025-02-05:** Created DEMO_SCRIPT.md with 11-minute demo flow
+- **2025-02-05:** Created KNOWN_BEHAVIORS.md explaining vector search variance
+- **2025-02-06:** Added unsafe query endpoint (/api/query/unsafe) for problem statement demo
+- **2025-02-06:** Implemented side-by-side answer comparison UI (unsafe vs. protected)
+- **2025-02-06:** Fixed quarantine restore/clear UI updates (filter RESTORED documents)
+- **2025-02-06:** Improved button color consistency (all red buttons use #d32f2f)
+- **2025-02-06:** Added Clear button for resetting query and answers
+- **2025-02-06:** Fixed event logging to show full document names instead of quarantine IDs
+- **2025-02-06:** Added file_path field to BlastRadiusReport for false positive investigation
+- **2025-02-06:** Made blast radius loading async with loading/error states
+- **2025-02-06:** Renamed "Time Window" to "Attack Window" with explanation tooltip
+- **2025-02-06:** Fixed HTTP 500 error in unsafe query (added 'id' key to documents)
+- **2025-02-06:** Added comprehensive error handling and validation in unsafe query endpoint
+- **2025-02-06:** Created BLAST_RADIUS_EXPLAINED.md documenting query lineage behavior
+- **2025-02-06:** Moved all markdown files to readme/ folder for organization
+- **2025-02-06:** Documented false positive learning strategy with trust boosting (Phase 3)

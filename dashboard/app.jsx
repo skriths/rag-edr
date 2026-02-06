@@ -114,11 +114,19 @@ function App() {
 
     const handleBlastRadius = async (docId) => {
         try {
+            // Set loading state (non-blocking)
+            setBlastRadius({ loading: true, doc_id: docId });
+
             const res = await fetch(`${API_BASE}/api/blast-radius/${docId}`);
             const data = await res.json();
             setBlastRadius(data);
         } catch (error) {
             console.error("Error fetching blast radius:", error);
+            setBlastRadius({
+                error: true,
+                doc_id: docId,
+                message: "Failed to load blast radius. Try clicking again."
+            });
         }
     };
 
@@ -595,6 +603,28 @@ function BlastRadiusPanel({ report }) {
         );
     }
 
+    // Loading state
+    if (report.loading) {
+        return (
+            <div className="panel">
+                <div className="panel-title">Blast Radius Analysis</div>
+                <div className="empty-state">Loading impact analysis for {report.doc_id}...</div>
+            </div>
+        );
+    }
+
+    // Error state
+    if (report.error) {
+        return (
+            <div className="panel">
+                <div className="panel-title">Blast Radius Analysis</div>
+                <div className="empty-state" style={{color: '#d32f2f'}}>
+                    {report.message || "Error loading blast radius"}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="panel">
             <div className="panel-title">Blast Radius Analysis</div>
@@ -621,7 +651,10 @@ function BlastRadiusPanel({ report }) {
                         </div>
                     )}
                     <div style={{fontSize: '12px', color: '#888', marginTop: '5px'}}>
-                        <strong>Time Window:</strong> {new Date(report.time_window_start).toLocaleString()} → {new Date(report.time_window_end).toLocaleString()}
+                        <strong>Attack Window:</strong> {new Date(report.time_window_start).toLocaleString()} → {new Date(report.time_window_end).toLocaleString()}
+                        <div style={{fontSize: '11px', color: '#666', marginTop: '3px', marginLeft: '10px'}}>
+                            (When queries retrieved this poisoned document)
+                        </div>
                     </div>
                 </div>
                 {report.recommended_actions.length > 0 && (

@@ -92,9 +92,33 @@ async def execute_unsafe_query(request: QueryRequest):
             exclude_quarantined=False  # Include poisoned docs!
         )
 
+        # Check if we got valid documents
+        if not documents:
+            raise HTTPException(
+                status_code=404,
+                detail="No documents found in vector store. Please run: python3 ingest_corpus.py"
+            )
+
+        # Validate document structure
+        if not isinstance(documents, list):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Invalid document format: expected list, got {type(documents).__name__}"
+            )
+
         # Extract content for LLM (no integrity checks!)
-        doc_contents = [doc["content"] for doc in documents]
-        doc_ids = [doc["id"] for doc in documents]
+        doc_contents = []
+        doc_ids = []
+
+        for i, doc in enumerate(documents):
+            if not isinstance(doc, dict):
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Invalid document at index {i}: expected dict, got {type(doc).__name__}"
+                )
+
+            doc_contents.append(doc.get("content", ""))
+            doc_ids.append(doc.get("id", doc.get("doc_id", f"unknown-{i}")))
 
         # Generate answer using ALL documents (unsafe!)
         answer = await llm.generate(request.query, doc_contents)
@@ -117,8 +141,11 @@ async def execute_unsafe_query(request: QueryRequest):
             "_unsafe_mode": True,
             "_warning": "⚠️ UNSAFE MODE: This query bypassed all integrity checks. Answer may contain malicious advice."
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        raise HTTPException(status_code=500, detail=f"{str(e)}\n{traceback.format_exc()}")
 
 
 # ==================== Event Endpoints ====================
