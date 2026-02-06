@@ -23,7 +23,7 @@ class VectorStore:
     - is_quarantined: Boolean flag
     - quarantine_id: If quarantined, reference to vault
     - category: clean/poisoned/golden
-    - cve_ids: List of CVE IDs found in document (Phase 1)
+    - cve_ids: Comma-separated string of CVE IDs (Phase 1, e.g., "CVE-2024-0001,CVE-2024-0002")
     """
 
     def __init__(self):
@@ -56,8 +56,10 @@ class VectorStore:
         metadata.setdefault("quarantine_id", "")
 
         # Phase 1: Extract and store CVE IDs from content
+        # ChromaDB requires scalar types, so store as comma-separated string
         entities = EntityExtractor.extract_entities(content)
-        metadata.setdefault("cve_ids", entities["cve_ids"])
+        cve_ids_str = ",".join(entities["cve_ids"]) if entities["cve_ids"] else ""
+        metadata.setdefault("cve_ids", cve_ids_str)
 
         # Generate embedding
         embedding = self.embedding_model.encode(content).tolist()
@@ -81,21 +83,26 @@ class VectorStore:
         Retrieve documents for query with optional metadata filtering.
 
         Phase 1: Supports ChromaDB WHERE filters for exact CVE ID matching.
+        Note: cve_ids is stored as comma-separated string.
 
         Args:
             query: Search query
             k: Number of results
             exclude_quarantined: Filter out quarantined docs
-            metadata_filter: Optional ChromaDB WHERE clause (e.g., {"cve_ids": {"$contains": "CVE-2024-0004"}})
+            metadata_filter: Optional ChromaDB WHERE clause for exact CVE match
+                Example: {"$or": [
+                    {"cve_ids": {"$eq": "CVE-2024-0004"}},
+                    {"cve_ids": {"$contains": "CVE-2024-0004,"}}
+                ]}
 
         Returns:
             List of dicts with keys: doc_id, content, metadata, distance, embedding
 
         Example:
-            # Exact CVE ID match
+            # Exact CVE ID match (single CVE or within comma-separated list)
             results = await retrieve(
                 "How to fix CVE-2024-0004?",
-                metadata_filter={"cve_ids": {"$contains": "CVE-2024-0004"}}
+                metadata_filter=create_cve_filter("CVE-2024-0004")
             )
         """
         # Generate query embedding

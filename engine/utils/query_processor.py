@@ -67,6 +67,9 @@ class QueryProcessor:
         Phase 1: Filter by first CVE ID found
         Future Phase 2: Multi-CVE filters, software filters
 
+        Note: cve_ids is stored as comma-separated string in ChromaDB.
+        This filter matches if the CVE ID appears in that string.
+
         Args:
             query: User query
 
@@ -84,7 +87,8 @@ class QueryProcessor:
 
         # Phase 1: Filter by first CVE ID only
         if entities["cve_ids"]:
-            # Use $contains operator for list field matching
+            # cve_ids stored as comma-separated string: "CVE-2024-0001,CVE-2024-0002"
+            # $contains will match if CVE appears anywhere in the string
             return {"cve_ids": {"$contains": entities["cve_ids"][0]}}
 
         # Future Phase 2: Add software, version filters
