@@ -23,7 +23,8 @@ class VectorStore:
     - is_quarantined: Boolean flag
     - quarantine_id: If quarantined, reference to vault
     - category: clean/poisoned/golden
-    - cve_ids: Comma-separated string of CVE IDs (Phase 1, e.g., "CVE-2024-0001,CVE-2024-0002")
+    - cve_ids: CVE ID string (Phase 1, e.g., "CVE-2024-0004")
+      Note: Currently stores single CVE per document for $eq filtering
     """
 
     def __init__(self):
@@ -56,10 +57,11 @@ class VectorStore:
         metadata.setdefault("quarantine_id", "")
 
         # Phase 1: Extract and store CVE IDs from content
-        # ChromaDB requires scalar types, so store as comma-separated string
+        # ChromaDB requires scalar types and only supports $eq for exact match
+        # Store first CVE ID only (sufficient for current corpus where each doc has one CVE)
         entities = EntityExtractor.extract_entities(content)
-        cve_ids_str = ",".join(entities["cve_ids"]) if entities["cve_ids"] else ""
-        metadata.setdefault("cve_ids", cve_ids_str)
+        cve_id_str = entities["cve_ids"][0] if entities["cve_ids"] else ""
+        metadata.setdefault("cve_ids", cve_id_str)
 
         # Generate embedding
         embedding = self.embedding_model.encode(content).tolist()
@@ -83,26 +85,24 @@ class VectorStore:
         Retrieve documents for query with optional metadata filtering.
 
         Phase 1: Supports ChromaDB WHERE filters for exact CVE ID matching.
-        Note: cve_ids is stored as comma-separated string.
+        Note: cve_ids stores single CVE ID string, filtered with $eq.
 
         Args:
             query: Search query
             k: Number of results
             exclude_quarantined: Filter out quarantined docs
             metadata_filter: Optional ChromaDB WHERE clause for exact CVE match
-                Example: {"$or": [
-                    {"cve_ids": {"$eq": "CVE-2024-0004"}},
-                    {"cve_ids": {"$contains": "CVE-2024-0004,"}}
-                ]}
+                Example: {"cve_ids": {"$eq": "CVE-2024-0004"}}
+                Supported operators: $eq, $ne, $gt, $gte, $lt, $lte, $in, $nin
 
         Returns:
             List of dicts with keys: doc_id, content, metadata, distance, embedding
 
         Example:
-            # Exact CVE ID match (single CVE or within comma-separated list)
+            # Exact CVE ID match
             results = await retrieve(
                 "How to fix CVE-2024-0004?",
-                metadata_filter=create_cve_filter("CVE-2024-0004")
+                metadata_filter={"cve_ids": {"$eq": "CVE-2024-0004"}}
             )
         """
         # Generate query embedding

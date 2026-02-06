@@ -87,9 +87,9 @@ class QueryProcessor:
 
         # Phase 1: Filter by first CVE ID only
         if entities["cve_ids"]:
-            # cve_ids stored as comma-separated string: "CVE-2024-0001,CVE-2024-0002"
-            # $contains will match if CVE appears anywhere in the string
-            return {"cve_ids": {"$contains": entities["cve_ids"][0]}}
+            # ChromaDB only supports: $eq, $ne, $gt, $gte, $lt, $lte, $in, $nin
+            # Since each document typically has one CVE, use $eq for exact match
+            return {"cve_ids": {"$eq": entities["cve_ids"][0]}}
 
         # Future Phase 2: Add software, version filters
         # if entities["software"]:
