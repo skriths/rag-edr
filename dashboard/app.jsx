@@ -6,6 +6,7 @@ function App() {
     const [quarantined, setQuarantined] = useState([]);
     const [blastRadius, setBlastRadius] = useState(null);
     const [selectedUser, setSelectedUser] = useState('analyst-1');
+    const [latestSignals, setLatestSignals] = useState(null);
 
     // SSE connection for live events
     useEffect(() => {
@@ -16,6 +17,11 @@ function App() {
             try {
                 const event = JSON.parse(e.data);
                 setEvents(prev => [event, ...prev].slice(0, 100)); // Keep last 100
+
+                // Extract integrity signals from quarantine events
+                if (event.event_id === 2001 && event.metadata && event.metadata.integrity_signals) {
+                    setLatestSignals(event.metadata.integrity_signals);
+                }
             } catch (error) {
                 console.error("Error parsing event:", error);
             }
@@ -179,7 +185,7 @@ function App() {
             </div>
 
             {/* Integrity Criteria Display - Top Row */}
-            <IntegrityCriteriaDisplay />
+            <IntegrityCriteriaDisplay latestSignals={latestSignals} />
 
             {/* Main Content - Two Columns */}
             <div className="dashboard-grid">
@@ -205,18 +211,26 @@ function App() {
 }
 
 // Integrity Criteria Display - Shows thresholds and detection logic
-function IntegrityCriteriaDisplay() {
+function IntegrityCriteriaDisplay({ latestSignals }) {
+    const getScoreColor = (score) => {
+        if (score >= 0.7) return '#4CAF50';
+        if (score >= 0.5) return '#FFC107';
+        return '#f44336';
+    };
+
     const criteria = [
         {
             icon: '🏢',
             name: 'Trust Score',
+            key: 'trust_score',
             description: 'Source Reputation',
             threshold: '>50%',
             checks: 'Domain verification against trusted sources list'
         },
         {
             icon: '🚩',
-            name: 'Red Flag Detection',
+            name: 'Safety Score',
+            key: 'red_flag_score',
             description: 'Malicious Patterns',
             threshold: '>50%',
             checks: '5 categories: security downgrade, dangerous permissions, severity downplay, unsafe operations, social engineering'
@@ -224,6 +238,7 @@ function IntegrityCriteriaDisplay() {
         {
             icon: '📊',
             name: 'Anomaly Score',
+            key: 'anomaly_score',
             description: 'Source Diversity',
             threshold: '>50%',
             checks: 'Distribution analysis across retrieval sources'
@@ -231,6 +246,7 @@ function IntegrityCriteriaDisplay() {
         {
             icon: '🎯',
             name: 'Alignment Score',
+            key: 'semantic_drift_score',
             description: 'Semantic Drift',
             threshold: '>50%',
             checks: 'Embedding similarity to golden corpus baseline'
@@ -246,15 +262,40 @@ function IntegrityCriteriaDisplay() {
                 </div>
             </div>
             <div className="criteria-grid">
-                {criteria.map((criterion, idx) => (
-                    <div key={idx} className="criteria-card">
-                        <div className="criteria-icon">{criterion.icon}</div>
-                        <div className="criteria-name">{criterion.name}</div>
-                        <div className="criteria-description">{criterion.description}</div>
-                        <div className="criteria-threshold">Threshold: {criterion.threshold}</div>
-                        <div className="criteria-checks">{criterion.checks}</div>
-                    </div>
-                ))}
+                {criteria.map((criterion, idx) => {
+                    const score = latestSignals && latestSignals[criterion.key];
+                    const hasScore = score !== undefined && score !== null;
+
+                    return (
+                        <div key={idx} className="criteria-card">
+                            <div className="criteria-icon">{criterion.icon}</div>
+                            <div className="criteria-name">{criterion.name}</div>
+
+                            {hasScore ? (
+                                <>
+                                    <div style={{
+                                        fontSize: '32px',
+                                        fontWeight: 'bold',
+                                        color: getScoreColor(score),
+                                        margin: '10px 0'
+                                    }}>
+                                        {(score * 100).toFixed(0)}%
+                                    </div>
+                                    <div style={{fontSize: '11px', color: '#666', marginBottom: '5px'}}>
+                                        {score < 0.5 ? '❌ Below threshold' : '✅ Pass'}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="criteria-description">{criterion.description}</div>
+                                    <div className="criteria-threshold">Threshold: {criterion.threshold}</div>
+                                </>
+                            )}
+
+                            <div className="criteria-checks">{criterion.checks}</div>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
@@ -516,7 +557,7 @@ function BlastRadiusPanel({ report }) {
                             marginBottom: '10px'
                         }}
                     >
-                        {showJson ? '▼ Hide' : '▶ Show'} Raw JSON (SIEM Export)
+                        {showJson ? '▼ Hide' : '▶ Show'} Raw JSON
                     </button>
 
                     {showJson && (

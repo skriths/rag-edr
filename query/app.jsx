@@ -247,7 +247,7 @@ function MessageComponent({ message }) {
             <div className="message">
                 <div className={`message-answer ${isUnsafe ? 'answer-unsafe' : 'answer-protected'}`}>
                     <div className={`answer-badge ${isUnsafe ? 'badge-unsafe' : 'badge-protected'}`}>
-                        {isUnsafe ? '⚠️ UNPROTECTED' : '🛡️ PROTECTED BY RAGSHIELD'}
+                        {isUnsafe ? '⚠️ UNPROTECTED' : '🛡️ PROTECTED BY RAGShield'}
                     </div>
 
                     <div className="answer-text">

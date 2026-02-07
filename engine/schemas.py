@@ -104,11 +104,11 @@ class IntegritySignals(BaseModel):
         if self.trust_score < threshold:
             low_signals.append(f"trust ({self.trust_score:.2f})")
         if self.red_flag_score < threshold:
-            low_signals.append(f"red_flag ({self.red_flag_score:.2f})")
+            low_signals.append(f"safety ({self.red_flag_score:.2f})")
         if self.anomaly_score < threshold:
             low_signals.append(f"anomaly ({self.anomaly_score:.2f})")
         if self.semantic_drift_score < threshold:
-            low_signals.append(f"semantic_drift ({self.semantic_drift_score:.2f})")
+            low_signals.append(f"alignment ({self.semantic_drift_score:.2f})")
         return low_signals
 
 
