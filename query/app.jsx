@@ -106,7 +106,7 @@ function App() {
     return (
         <div>
             <div className="header">
-                <h1>RAG Query Application</h1>
+                <h1>🛡️ RAGShield Query Application</h1>
                 <p>Ask questions about security vulnerabilities and patches</p>
             </div>
 
@@ -166,7 +166,7 @@ function App() {
                             onChange={() => setMode('protected')}
                         />
                         <label htmlFor="protected-mode">
-                            Protected Mode (RAG-EDR)
+                            Protected Mode (RAGShield)
                         </label>
                     </div>
                 </div>
@@ -247,7 +247,7 @@ function MessageComponent({ message }) {
             <div className="message">
                 <div className={`message-answer ${isUnsafe ? 'answer-unsafe' : 'answer-protected'}`}>
                     <div className={`answer-badge ${isUnsafe ? 'badge-unsafe' : 'badge-protected'}`}>
-                        {isUnsafe ? '⚠️ UNPROTECTED' : '✅ PROTECTED'}
+                        {isUnsafe ? '⚠️ UNPROTECTED' : '🛡️ PROTECTED BY RAGSHIELD'}
                     </div>
 
                     <div className="answer-text">
@@ -258,7 +258,7 @@ function MessageComponent({ message }) {
 
                     {!isUnsafe && message.quarantinedDocs && message.quarantinedDocs.length > 0 && (
                         <div className="answer-metadata">
-                            🛡️ RAG-EDR: {message.quarantinedDocs.length} document(s) quarantined
+                            🛡️ RAGShield: {message.quarantinedDocs.length} document(s) quarantined
                         </div>
                     )}
                 </div>

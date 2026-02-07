@@ -35,7 +35,7 @@ class VectorStore:
         )
         self.collection = self.client.get_or_create_collection(
             name=config.CHROMA_COLLECTION,
-            metadata={"description": "RAG-EDR document corpus"}
+            metadata={"description": "RAGShielddocument corpus"}
         )
 
         # Load embedding model for semantic similarity
@@ -230,7 +230,7 @@ class VectorStore:
         self.client.delete_collection(name=config.CHROMA_COLLECTION)
         self.collection = self.client.get_or_create_collection(
             name=config.CHROMA_COLLECTION,
-            metadata={"description": "RAG-EDR document corpus"}
+            metadata={"description": "RAGShielddocument corpus"}
         )
 
 

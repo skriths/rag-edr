@@ -1,5 +1,5 @@
 """
-FastAPI backend for RAG-EDR system.
+FastAPI backend for RAGShieldsystem.
 
 Endpoints:
 - POST /api/query: Execute RAG query
@@ -34,9 +34,9 @@ import config
 
 # Create FastAPI app
 app = FastAPI(
-    title="RAG-EDR API",
+    title="RAGShieldAPI",
     version="1.0.0",
-    description="Endpoint Detection & Response for RAG Systems"
+    description="RAGShield: Detection & Response for RAG Systems"
 )
 
 # CORS for local development
@@ -394,7 +394,7 @@ async def system_status():
 async def root():
     """Health check"""
     return {
-        "status": "RAG-EDR API running",
+        "status": "RAGShieldAPI running",
         "version": "1.0.0",
         "endpoints": {
             "docs": "/docs",
@@ -409,7 +409,7 @@ async def root():
 @app.on_event("startup")
 async def startup():
     """Initialize pipeline on startup"""
-    print("Starting RAG-EDR API...")
+    print("Starting RAGShieldAPI...")
 
     try:
         ollama_ok = await rag_pipeline.initialize()
@@ -421,7 +421,7 @@ async def startup():
 
         print(f"Document count: {vector_store.get_document_count()}")
         print(f"Quarantined: {quarantine_vault.get_quarantine_count()}")
-        print("RAG-EDR API ready!")
+        print("RAGShieldAPI ready!")
     except Exception as e:
         print(f"ERROR during startup: {e}")
 
@@ -429,7 +429,7 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     """Cleanup on shutdown"""
-    print("Shutting down RAG-EDR API...")
+    print("Shutting down RAGShieldAPI...")
 
 
 # Serve dashboard static files

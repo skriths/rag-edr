@@ -1,6 +1,6 @@
-# RAG-EDR Query Test Guide
+# RAGShieldQuery Test Guide
 
-This document provides test queries for demonstrating the RAG-EDR system across different domains. Each query is designed to showcase specific aspects of the integrity detection system.
+This document provides test queries for demonstrating the RAGShieldsystem across different domains. Each query is designed to showcase specific aspects of the integrity detection system.
 
 ---
 

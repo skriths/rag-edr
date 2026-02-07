@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Diagnostic script to check RAG-EDR system state.
+Diagnostic script to check RAGShieldsystem state.
 """
 import asyncio
 from engine.adapters.vector_store import vector_store
@@ -9,7 +9,7 @@ from engine.detection.trust_scorer import trust_scorer
 
 async def diagnose():
     print("=" * 60)
-    print("RAG-EDR System Diagnostic")
+    print("RAGShieldSystem Diagnostic")
     print("=" * 60)
 
     # Get all documents

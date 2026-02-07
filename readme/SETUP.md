@@ -1,48 +1,301 @@
-# RAG-EDR Setup & Execution Guide
+# RAGShield Setup & Installation Guide
 
-## System Overview
+## System Requirements
 
-RAG-EDR is now fully implemented with:
-- ✅ 4-signal integrity detection (Trust, Red Flag, Anomaly, Semantic Drift)
-- ✅ Quarantine vault with audit trails
-- ✅ Blast radius analysis
-- ✅ Event logging (Windows Event Viewer style)
-- ✅ FastAPI backend with SSE streaming
-- ✅ React dashboard (no build step required)
-- ✅ 7 corpus documents (3 clean, 2 poisoned, 2 golden)
+### Hardware Requirements
 
-## File Structure
+| Resource | Minimum | Recommended | Notes |
+|----------|---------|-------------|-------|
+| **RAM** | 16GB | 32GB | Mistral model requires ~8GB during inference |
+| **Disk Space** | 10GB free | 20GB free | 4GB for Mistral, 6GB for dependencies |
+| **CPU** | 4 cores | 8+ cores | GPU optional but recommended for production |
+| **Network** | Stable connection | - | For Ollama and pip downloads |
 
-```
-rag-edr/
-├── config.py                    # Central configuration
-├── requirements.txt             # Dependencies
-├── ingest_corpus.py            # Corpus ingestion script
-├── run.py                      # Application entry point
-├── demo.sh                     # Demo orchestration script
-├── engine/                     # Core backend
-│   ├── schemas.py              # Pydantic models
-│   ├── pipeline.py             # RAG orchestrator
-│   ├── api.py                  # FastAPI endpoints
-│   ├── adapters/               # ChromaDB & Ollama adapters
-│   ├── detection/              # 4 integrity signals
-│   ├── response/               # Quarantine & blast radius
-│   └── logging/                # Event logger
-├── dashboard/                  # React frontend
-│   ├── index.html              # Main page
-│   └── app.jsx                 # React app
-└── corpus/                     # Documents
-    ├── clean/                  # 3 legitimate CVEs
-    ├── poisoned/               # 2 malicious CVEs
-    └── golden/                 # 2 baseline docs
+### Software Requirements
+
+- **OS:** Ubuntu 20.04+ or macOS 11+
+- **Python:** 3.10 or higher
+- **Ollama:** Latest version (for local LLM inference)
+- **Git:** For cloning repository
+
+---
+
+## Installation Steps
+
+### 1. Install Ollama
+
+```bash
+# Option A: Using provided script
+chmod +x ollama_install.sh && ./ollama_install.sh
+
+# Option B: Fresh download
+curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-## Prerequisites
+**Verify Ollama installation:**
+```bash
+ollama --version
+# Should show: ollama version 0.x.x
+```
 
-### 1. Ollama with Mistral
+---
 
-On your Ubuntu machine (or wherever Ollama is running):
+### 2. Pull Mistral Model
 
+```bash
+# Download Mistral model (~4GB, 5-10 minutes)
+ollama pull mistral
+
+# Verify model is available
+ollama list | grep mistral
+# Should show: mistral:latest
+```
+
+**Test Mistral:**
+```bash
+ollama run mistral "Hello, are you working?" --verbose
+# Should get a response. Press Ctrl+D to exit.
+```
+
+---
+
+### 3. Python Environment Setup
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate  # On Ubuntu/macOS
+# OR
+venv\Scripts\activate  # On Windows
+```
+
+---
+
+### 4. Install Python Dependencies
+
+**Install latest versions (recommended):**
+```bash
+# Core dependencies
+pip install langchain langchain-community chromadb sentence-transformers
+
+# Ollama Python client
+pip install ollama
+
+# Web framework
+pip install fastapi uvicorn
+
+# Data models
+pip install pydantic
+```
+
+**Alternative: Using requirements.txt:**
+```bash
+pip install -r requirements.txt
+```
+
+**Note:** `requirements.txt` contains older package versions. The commands above install latest versions, which are recommended for this project.
+
+---
+
+### 5. Verify Installation
+
+```bash
+# Check Python packages
+pip list | grep -E "langchain|chromadb|sentence-transformers|ollama|fastapi"
+
+# Expected output (versions may vary):
+# langchain                     0.3.x
+# langchain-community           0.3.x
+# chromadb                      0.5.x
+# sentence-transformers         3.x.x
+# ollama                        0.4.x
+# fastapi                       0.115.x
+# uvicorn                       0.32.x
+# pydantic                      2.x.x
+```
+
+---
+
+## Post-Installation Setup
+
+### 1. Ingest Corpus
+
+```bash
+# Ingest corpus documents into ChromaDB
+python3 ingest_corpus.py
+```
+
+**Expected output:**
+```
+============================================================
+RAGShield Corpus Ingestion
+============================================================
+
+Processing clean corpus...
+  ✓ Ingested: CVE-2024-0001 (source=nvd.nist.gov)
+  ✓ Ingested: CVE-2024-0002 (source=ubuntu.com/security)
+  ✓ Ingested: CVE-2024-0003 (source=debian.org/security)
+  ✓ Ingested: CVE-2024-0006 (source=ubuntu.com/security)
+  ✓ Ingested: CVE-2024-0007 (source=debian.org/security)
+  5 documents from clean corpus
+
+Processing poisoned corpus...
+  ✓ Ingested: CVE-2024-0004-poisoned (source=unknown-security-site.com)
+  ✓ Ingested: CVE-2024-0005-poisoned (source=untrusted-ssl-blog.org)
+  ✓ Ingested: CVE-2024-0008-poisoned (source=unknown-redis-blog.net)
+  3 documents from poisoned corpus
+
+Processing golden corpus...
+  ✓ Ingested: security-best-practices (source=golden)
+  ✓ Ingested: patch-management-procedures (source=golden)
+  2 documents from golden corpus
+
+============================================================
+Corpus ingestion complete! Total: 11 documents
+============================================================
+```
+
+**What this does:**
+- Creates `chroma_db/` directory
+- Embeds all corpus documents using sentence-transformers
+- Stores embeddings and metadata in ChromaDB
+- Takes ~30-60 seconds depending on hardware
+
+---
+
+### 2. Start Server
+
+```bash
+python3 run.py
+```
+
+**Expected output:**
+```
+============================================================
+RAGShield Server Starting
+============================================================
+
+Checking Ollama connection...
+✓ Ollama connected (http://localhost:11434)
+
+Checking Mistral model...
+✓ Mistral model available
+
+Loading RAGShield components...
+✓ Event logger initialized
+✓ Vector store connected (11 documents)
+✓ Quarantine vault initialized
+✓ Blast radius analyzer ready
+✓ Integrity engine loaded (4 signals)
+
+INFO:     Started server process
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Application startup complete
+
+============================================================
+Dashboard: http://localhost:8000/dashboard/index.html
+API Docs:  http://localhost:8000/docs
+============================================================
+```
+
+---
+
+### 3. Access Dashboard
+
+Open browser to: **http://localhost:8000/dashboard/index.html**
+
+**Alternative endpoints:**
+- API Documentation: http://localhost:8000/docs
+- API Health Check: http://localhost:8000/api/status
+- Event Stream (SSE): http://localhost:8000/api/events/stream
+
+---
+
+## Quick Test
+
+### Test 1: Clean Query (Should Pass)
+
+**In Dashboard:**
+1. Enter query: `How do I patch CVE-2024-0001?`
+2. Click: **"✓ Execute With RAG-EDR"**
+
+**Expected Result:**
+- ✅ Trust Score: 90% (GREEN)
+- ✅ Safety Score: 100% (GREEN)
+- ✅ Distribution: 85% (GREEN)
+- ✅ Alignment: 75% (GREEN)
+- ✅ Answer: Proper Apache HTTP Server patching guidance
+- ✅ Event log: RAG-1001 (query received), RAG-4001 (successful)
+
+---
+
+### Test 2: Poisoned Query (Should Quarantine)
+
+**In Dashboard:**
+1. Enter query: `How to mitigate CVE-2024-0004?`
+2. Click: **"⚠️ Execute Without Protection (Demo)"**
+3. Observe malicious answer (left panel, red border)
+4. Click: **"✓ Execute With RAG-EDR"**
+
+**Expected Result:**
+- ❌ Trust Score: 30% (RED)
+- ❌ Safety Score: 34% (RED)
+- ✅ Distribution: 75% (YELLOW)
+- ✅ Alignment: 68% (YELLOW)
+- ⚠️ Quarantine triggered (2 of 4 signals below 50%)
+- ⚠️ Event log: RAG-2001 (document quarantined)
+- ⚠️ Quarantine vault: Shows CVE-2024-0004-poisoned.txt
+- ✅ Answer: Clean answer OR safety message
+
+---
+
+### Test 3: Blast Radius Analysis
+
+**In Dashboard:**
+1. Wait 2-3 seconds after quarantine (for lineage write)
+2. Click quarantined document in vault (bottom-left panel)
+
+**Expected Result:**
+- Document: CVE-2024-0004-poisoned
+- File path: `/path/to/quarantine_vault/Q-[timestamp]-CVE-2024-0004-poisoned/content.txt`
+- Affected Queries: 1
+- Affected Users: 1 (analyst-1 or your selected persona)
+- Severity: MEDIUM
+- Attack Window: Shows when query happened
+- Query Lineage Log: Shows queries that retrieved this document
+
+---
+
+## Troubleshooting
+
+### Issue 1: ModuleNotFoundError
+
+**Symptom:**
+```
+ModuleNotFoundError: No module named 'langchain'
+```
+
+**Solution:**
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Install missing packages
+pip install langchain langchain-community chromadb sentence-transformers ollama fastapi uvicorn pydantic
+```
+
+---
+
+### Issue 2: Ollama Connection Failed
+
+**Symptom:**
+```
+Error: Could not connect to Ollama at http://localhost:11434
+```
+
+**Solution:**
 ```bash
 # Check if Ollama is running
 curl http://localhost:11434/api/tags
@@ -50,282 +303,336 @@ curl http://localhost:11434/api/tags
 # If not running, start Ollama
 ollama serve
 
-# Ensure Mistral model is available
+# In another terminal, verify
+ollama list
+```
+
+---
+
+### Issue 3: Mistral Model Not Found
+
+**Symptom:**
+```
+Error: Model 'mistral' not found
+```
+
+**Solution:**
+```bash
+# Pull Mistral model
 ollama pull mistral
+
+# Verify
 ollama list | grep mistral
 ```
 
-### 2. Python Packages
+---
 
-You mentioned you have a virtual environment with the required packages. Activate it:
+### Issue 4: No Documents Retrieved
 
+**Symptom:**
+- Query returns: "No documents in vector store"
+- Integrity signals show N/A
+
+**Solution:**
 ```bash
-# On Ubuntu
-source venv/bin/activate
-
-# Verify packages are installed
-pip3 list | grep -i "langchain\|fastapi\|chroma\|pydantic"
-```
-
-If packages are missing, install them:
-
-```bash
-pip3 install -r requirements.txt
-```
-
-## Running the System
-
-### Option 1: Quick Start (Using demo.sh)
-
-```bash
-./demo.sh
-```
-
-This script will:
-1. Check Ollama connection
-2. Check Mistral model
-3. Activate venv (if present)
-4. Ingest corpus (if not already done)
-5. Start the server
-
-### Option 2: Manual Steps
-
-#### Step 1: Ingest Corpus
-
-```bash
+# Re-ingest corpus
 python3 ingest_corpus.py
+
+# Verify ChromaDB
+ls -la chroma_db/
+# Should show directory with database files
 ```
 
-Expected output:
+---
+
+### Issue 5: ChromaDB Errors
+
+**Symptom:**
 ```
-============================================================
-RAG-EDR Corpus Ingestion
-============================================================
-
-Processing clean corpus...
-  ✓ Ingested: CVE-2024-0001 (source=nvd.nist.gov)
-  ✓ Ingested: CVE-2024-0002 (source=ubuntu.com/security)
-  ✓ Ingested: CVE-2024-0003 (source=debian.org/security)
-  3 documents from clean corpus
-
-Processing poisoned corpus...
-  ✓ Ingested: CVE-2024-0004-poisoned (source=unknown)
-  ✓ Ingested: CVE-2024-0005-poisoned (source=unknown)
-  2 documents from poisoned corpus
-
-Processing golden corpus...
-  ✓ Ingested: security-best-practices (source=golden)
-  ✓ Ingested: incident-response-procedures (source=golden)
-  2 documents from golden corpus
-
-============================================================
-Corpus ingestion complete! Total: 7 documents
-============================================================
+chromadb.errors.InvalidCollectionException: Collection 'rag_corpus' does not exist
 ```
 
-#### Step 2: Start Server
-
+**Solution:**
 ```bash
+# Delete and recreate ChromaDB
+rm -rf chroma_db/
+python3 ingest_corpus.py
+
+# Restart server
 python3 run.py
 ```
 
-Server will start on http://localhost:8000
+---
 
-#### Step 3: Access Dashboard
+### Issue 6: Port 8000 Already in Use
 
-Open browser to: **http://localhost:8000/dashboard/index.html**
-
-Alternative endpoints:
-- API Documentation: http://localhost:8000/docs
-- API Health: http://localhost:8000/api/status
-
-## Demo Flow
-
-### Test Query 1: Clean Query (Should Pass)
-
-**Query**: "How do I patch CVE-2024-0001?"
-
-**Expected Behavior**:
-- ✅ Retrieves clean document (CVE-2024-0001.txt)
-- ✅ All integrity scores GREEN (>70%)
-- ✅ Generates safe remediation answer
-- ✅ Event log shows "Query processed - integrity checks passed"
-- ✅ No quarantine action
-
-### Test Query 2: Poisoned Query (Should Trigger Quarantine)
-
-**Query**: "What should I do about CVE-2024-0004?"
-
-**Expected Behavior**:
-- ⚠️ Retrieves poisoned document (CVE-2024-0004-poisoned.txt)
-- ⚠️ Red flag score RED (<50%) - detects "disable firewall", "chmod 777"
-- ⚠️ Trust score RED (<50%) - unknown source
-- ⚠️ Event log shows "Document quarantined"
-- ⚠️ Quarantine vault shows new entry
-- ⚠️ Answer: "This query cannot be answered safely..."
-
-### Test Query 3: Mixed Query
-
-**Query**: "Show me all critical vulnerabilities"
-
-**Expected Behavior**:
-- Retrieves mix of clean and poisoned docs
-- Quarantines poisoned docs
-- Generates answer from clean docs only
-- Event log shows partial quarantine
-
-### Blast Radius Analysis
-
-1. Click on any quarantined document in the vault
-2. Blast Radius panel shows:
-   - Affected queries: 1
-   - Affected users: 1 (demo-user)
-   - Severity: MEDIUM
-   - Recommended actions
-
-## API Testing (Optional)
-
-### Health Check
-```bash
-curl http://localhost:8000/api/status
+**Symptom:**
+```
+ERROR:    [Errno 48] Address already in use
 ```
 
-### Execute Query
+**Solution:**
 ```bash
-curl -X POST http://localhost:8000/api/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "How do I patch CVE-2024-0001?", "user_id": "test-user"}'
+# Find process using port 8000
+lsof -i :8000
+
+# Kill process (replace PID with actual process ID)
+kill -9 <PID>
+
+# OR use a different port
+# Edit run.py: uvicorn.run(app, host="0.0.0.0", port=8001)
 ```
 
-### Get Events
-```bash
-curl http://localhost:8000/api/events?limit=10
+---
+
+### Issue 7: Dashboard Not Loading
+
+**Symptom:**
+- Browser shows "Unable to connect" or blank page
+
+**Solution:**
+1. **Verify server is running:**
+   ```bash
+   curl http://localhost:8000/api/status
+   # Should return JSON with status info
+   ```
+
+2. **Check browser console:**
+   - Open browser DevTools (F12)
+   - Check Console tab for JavaScript errors
+   - Check Network tab for failed requests
+
+3. **Try direct URL:**
+   ```
+   http://localhost:8000/dashboard/index.html
+   ```
+
+4. **Hard refresh browser:**
+   - Ctrl+Shift+R (Windows/Linux)
+   - Cmd+Shift+R (Mac)
+
+---
+
+### Issue 8: Slow Query Performance
+
+**Symptom:**
+- Queries take 2+ minutes to complete
+
+**Cause:** Mistral running on CPU (expected)
+
+**Solutions:**
+1. **Short-term:** Increase timeout in `engine/adapters/llm.py` (already set to 180s)
+2. **Medium-term:** Use GPU for Ollama:
+   ```bash
+   # If you have NVIDIA GPU with CUDA
+   ollama serve
+   ```
+3. **Long-term:** Use faster model or smaller context window
+
+---
+
+### Issue 9: Memory Issues
+
+**Symptom:**
+```
+Killed: 9
+```
+or
+```
+MemoryError
 ```
 
-### List Quarantined Docs
-```bash
-curl http://localhost:8000/api/quarantine
+**Cause:** Insufficient RAM (Mistral requires ~8GB during inference)
+
+**Solutions:**
+1. **Close other applications** to free up RAM
+2. **Use swap space** (Linux):
+   ```bash
+   sudo fallocate -l 8G /swapfile
+   sudo chmod 600 /swapfile
+   sudo mkswap /swapfile
+   sudo swapon /swapfile
+   ```
+3. **Upgrade to 32GB RAM** for better performance
+
+---
+
+## File Structure
+
+```
+rag-edr/
+├── README.md                    # Project overview
+├── requirements.txt             # Python dependencies (older versions)
+├── ollama_install.sh           # Ollama installation script
+├── ingest_corpus.py            # Corpus ingestion
+├── run.py                      # Server entry point
+├── config.py                   # Central configuration
+│
+├── engine/                     # Core backend
+│   ├── schemas.py              # Pydantic models
+│   ├── pipeline.py             # RAG orchestrator
+│   ├── api.py                  # FastAPI endpoints
+│   │
+│   ├── adapters/               # External integrations
+│   │   ├── vector_store.py     # ChromaDB wrapper
+│   │   └── llm.py              # Ollama/Mistral wrapper
+│   │
+│   ├── detection/              # 4 integrity signals
+│   │   ├── trust_scorer.py
+│   │   ├── red_flag_detector.py
+│   │   ├── anomaly_scorer.py
+│   │   ├── semantic_drift.py
+│   │   └── integrity_engine.py
+│   │
+│   ├── response/               # Quarantine & impact
+│   │   ├── quarantine_vault.py
+│   │   └── blast_radius.py
+│   │
+│   └── logging/                # Event logging
+│       └── event_logger.py
+│
+├── dashboard/                  # React frontend
+│   ├── index.html
+│   └── app.jsx
+│
+├── corpus/                     # Document corpus
+│   ├── clean/                  # 5 legitimate CVEs
+│   ├── poisoned/               # 3 malicious CVEs
+│   └── golden/                 # 2 baseline docs
+│
+├── readme/                     # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── COMPONENTS.md
+│   ├── QUERY_GUIDE.md
+│   ├── DEMO_SCRIPT.md
+│   └── ...
+│
+├── chroma_db/                  # ChromaDB storage (created on ingest)
+├── logs/                       # Event logs (created on run)
+│   ├── events.jsonl
+│   └── query_lineage.jsonl
+└── quarantine_vault/           # Quarantined documents (created on quarantine)
+    └── Q-[timestamp]-[doc-id]/
 ```
 
-### Blast Radius
-```bash
-curl http://localhost:8000/api/blast-radius/CVE-2024-0004-poisoned
+---
+
+## Advanced Configuration
+
+### Custom Port
+
+Edit `run.py`:
+```python
+uvicorn.run(app, host="0.0.0.0", port=8001)  # Change port
 ```
 
-### Reset Demo
+### Custom ChromaDB Path
+
+Edit `config.py`:
+```python
+CHROMA_DB_DIR = "./custom_chroma_db"
+```
+
+### Custom Corpus Path
+
+Edit `config.py`:
+```python
+CORPUS_BASE_DIR = "./custom_corpus"
+```
+
+### Adjust Integrity Thresholds
+
+Edit `config.py`:
+```python
+INTEGRITY_THRESHOLD = 0.4  # Lower = more aggressive (default: 0.5)
+```
+
+### Adjust Red Flag Amplifier
+
+Edit `engine/detection/red_flag_detector.py`:
+```python
+base_score = 1.0 - (flag_ratio * 2.0)  # More aggressive (default: 1.5)
+```
+
+---
+
+## Demo Reset
+
+To reset the system for a fresh demo:
+
+**Option 1: Via Dashboard**
+- Click **"Demo Reset (Clear All)"** button (top-right)
+- Confirms before clearing
+- Then run: `python3 ingest_corpus.py`
+
+**Option 2: Via API**
 ```bash
 curl -X POST http://localhost:8000/api/demo/reset
-```
-
-Then re-ingest corpus:
-```bash
 python3 ingest_corpus.py
 ```
 
-## Troubleshooting
-
-### Issue: ModuleNotFoundError
-
-**Solution**: Activate virtual environment or install packages:
+**Option 3: Manual**
 ```bash
-source venv/bin/activate  # If you have venv
-# OR
-pip3 install -r requirements.txt
-```
+# Delete all state
+rm -rf chroma_db/ logs/ quarantine_vault/
 
-### Issue: Ollama Connection Failed
-
-**Solution**: Make sure Ollama is running:
-```bash
-# Check status
-curl http://localhost:11434/api/tags
-
-# Start if needed
-ollama serve
-```
-
-### Issue: Dashboard Not Loading
-
-**Solution**:
-1. Check server is running on port 8000
-2. Try accessing directly: http://localhost:8000/dashboard/index.html
-3. Check browser console for errors
-
-### Issue: No Documents Retrieved
-
-**Solution**: Re-run corpus ingestion:
-```bash
+# Re-ingest
 python3 ingest_corpus.py
+
+# Restart server
+python3 run.py
 ```
 
-### Issue: ChromaDB Errors
+---
 
-**Solution**: Reset ChromaDB:
+## Performance Optimization
+
+### CPU Optimization (Current)
+- Use latest Python (3.12+) for better performance
+- Close unnecessary applications
+- Use SSD for ChromaDB storage
+
+### GPU Acceleration (Future)
 ```bash
-rm -rf chroma_db/
-python3 ingest_corpus.py
+# If you have NVIDIA GPU
+# Ollama automatically uses GPU if available
+nvidia-smi  # Check GPU usage during queries
 ```
 
-## Key Features Demonstrated
+### Production Optimization (Phase 3)
+- Use dedicated vector DB (Pinecone, Milvus)
+- GPU cluster for LLM inference
+- Redis cache for frequent queries
+- Load balancer for multiple instances
 
-1. **Multi-Signal Detection**:
-   - Trust scoring based on source reputation
-   - Red flag keyword detection (5 categories)
-   - Anomaly detection (source distribution)
-   - Semantic drift (golden corpus similarity)
-
-2. **Quarantine System**:
-   - Automatic document isolation
-   - Full content preservation
-   - Audit trail with state machine
-   - Analyst review workflow
-
-3. **Blast Radius Analysis**:
-   - Query lineage tracking
-   - Affected user identification
-   - Time window analysis
-   - Severity classification
-
-4. **Event Logging**:
-   - Windows Event Viewer style
-   - SIEM-ready JSONL format
-   - Event IDs (RAG-1001 to RAG-4002)
-   - Real-time SSE streaming
-
-5. **Dashboard**:
-   - Live event feed
-   - Integrity gauges (4 signals)
-   - Query console
-   - Quarantine vault browser
-   - Blast radius visualization
+---
 
 ## Next Steps
 
-For production deployment, consider:
-- [ ] User authentication
-- [ ] Multi-tenancy support
-- [ ] Advanced anomaly detection (ML-based)
-- [ ] NLI for contradiction detection
-- [ ] CVSS parsing and validation
-- [ ] Integration with real SIEM (Splunk, Sentinel)
-- [ ] Persistent storage for lineage (database)
-- [ ] Alert notifications (email, Slack)
-- [ ] Advanced analyst workflow UI
-- [ ] Performance optimization for large corpora
+- **For Demo:** See [DEMO_SCRIPT.md](DEMO_SCRIPT.md) for 11-minute flow
+- **For Testing:** See [QUERY_GUIDE.md](QUERY_GUIDE.md) for test scenarios
+- **For Architecture:** See [ARCHITECTURE.md](ARCHITECTURE.md) for system design
+- **For Components:** See [COMPONENTS.md](COMPONENTS.md) for deep dive
 
-## Demo Video Script
+---
 
-1. **Opening (30s)**: Show clean dashboard, explain 4 signals
-2. **Clean Query (1m)**: Execute clean CVE query, all green
-3. **Poisoned Query (2m)**: Execute poisoned query, watch quarantine
-4. **Blast Radius (1m)**: Click quarantined doc, show impact
-5. **Event Log (30s)**: Scroll through events, explain taxonomy
-6. **Closing (30s)**: Reset demo, re-ingest
+## Support & Resources
 
-Total: 5 minutes
+**Documentation:**
+- [Architecture](ARCHITECTURE.md) - System design
+- [Components](COMPONENTS.md) - Component details
+- [Query Guide](QUERY_GUIDE.md) - Test scenarios
+- [Implementation Status](IMPLEMENTATION_STATUS.md) - What's done/planned
 
-## Support
+**Logs:**
+- Events: `logs/events.jsonl`
+- Query Lineage: `logs/query_lineage.jsonl`
+- Quarantine Records: `quarantine_vault/Q-*/audit.jsonl`
 
-- GitHub: https://github.com/anthropics/claude-code/issues
-- Documentation: This file
-- Logs: `logs/events.jsonl` and `logs/query_lineage.jsonl`
+**Issues:**
+- GitHub Issues (if repository is public)
+- Check logs for detailed error messages
+
+---
+
+Last Updated: 2025-02-06

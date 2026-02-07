@@ -160,8 +160,8 @@ function App() {
     return (
         <div>
             <div className="header">
-                <h1>RAG-EDR Monitoring Dashboard</h1>
-                <p>Security Operations Console</p>
+                <h1>🛡️ RAGShield Monitoring Dashboard</h1>
+                <p>Detection & Response for RAG Systems</p>
                 <button
                     className="btn"
                     onClick={handleDemoReset}

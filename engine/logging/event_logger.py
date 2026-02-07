@@ -15,7 +15,7 @@ import config
 
 class EventLogger:
     """
-    Async JSONL logger for RAG-EDR events.
+    Async JSONL logger for RAGShieldevents.
 
     Event ID ranges:
     - RAG-1001 to RAG-1999: Integrity events

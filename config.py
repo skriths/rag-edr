@@ -1,5 +1,5 @@
 """
-Central configuration for RAG-EDR system.
+Central configuration for RAGShieldsystem.
 
 All paths, thresholds, and service configs defined here.
 """
@@ -136,7 +136,7 @@ EVENT_IDS = {
     3003: "Blast radius analysis completed",
 
     # System events (4001-4999)
-    4001: "RAG-EDR pipeline started",
+    4001: "RAGShieldpipeline started",
     4002: "Source trust degradation detected",
     4003: "Corpus ingestion completed",
     4004: "System reset initiated"

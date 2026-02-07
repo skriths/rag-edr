@@ -1,4 +1,4 @@
-# RAG-EDR Scoring System Guide
+# RAGShield Scoring System Guide
 
 ## Critical UX Issue: Score Display Semantics
 
@@ -302,7 +302,7 @@ semantic: 0.25     # Alignment to golden corpus
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ RAG-EDR Score Quick Reference                       │
+│ RAGShield Score Quick Reference                     │
 ├─────────────────────────────────────────────────────┤
 │ GREEN  (70-100%): PASS - No action needed          │
 │ YELLOW (50-70%):  WARN - Monitor closely           │

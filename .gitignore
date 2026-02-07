@@ -8,7 +8,7 @@ venv/
 env/
 ENV/
 
-# RAG-EDR specific
+# RAGShieldspecific
 logs/
 quarantine_vault/
 chroma_db/

@@ -9,7 +9,7 @@ import sys
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("RAG-EDR - Endpoint Detection & Response for RAG Systems")
+    print("RAGShield: Detection & Response for RAG Systems")
     print("=" * 60)
     print()
     print("Starting server...")

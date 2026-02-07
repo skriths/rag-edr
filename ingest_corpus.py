@@ -14,7 +14,7 @@ async def ingest_corpus():
     """Load all corpus documents into vector store"""
 
     print("=" * 60)
-    print("RAG-EDR Corpus Ingestion")
+    print("RAGShieldCorpus Ingestion")
     print("=" * 60)
 
     total_docs = 0

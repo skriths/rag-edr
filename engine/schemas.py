@@ -1,5 +1,5 @@
 """
-Pydantic data models for RAG-EDR system.
+Pydantic data models for RAGShieldsystem.
 
 Defines all core data structures: Events, Integrity Signals, Quarantine Records, Blast Radius Reports.
 """

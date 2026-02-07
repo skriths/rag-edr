@@ -1,5 +1,5 @@
 """
-RAG-EDR Pipeline: Orchestrates retrieval, integrity checks, and generation.
+RAGShieldPipeline: Orchestrates retrieval, integrity checks, and generation.
 
 Phase 1 Enhancement: Query preprocessing with CVE ID extraction and augmentation.
 """
@@ -215,7 +215,7 @@ class RAGPipeline:
         # Log startup
         await logger.log_system_event(
             event_id=4001,
-            message="RAG-EDR pipeline started",
+            message="RAGShieldpipeline started",
             details={
                 "ollama_connected": ollama_ok,
                 "document_count": vector_store.get_document_count(),
