@@ -108,13 +108,18 @@ class VectorStore:
         # Generate query embedding
         query_embedding = self.embedding_model.encode(query).tolist()
 
+        # Check if collection is empty (e.g., after demo reset)
+        doc_count = self.collection.count()
+        if doc_count == 0:
+            return []
+
         # Query ChromaDB (over-fetch if we need to filter)
         n_results = k * 3 if exclude_quarantined else k
 
         # Build query parameters
         query_params = {
             "query_embeddings": [query_embedding],
-            "n_results": min(n_results, self.collection.count()),
+            "n_results": min(n_results, doc_count),
             "include": ["documents", "metadatas", "distances", "embeddings"]
         }
 
