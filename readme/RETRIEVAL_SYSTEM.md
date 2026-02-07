@@ -1,8 +1,8 @@
 # RAGShield Retrieval System: Technical Reference
 
-**Document Version:** 1.2
+**Document Version:** 1.3
 **Last Updated:** February 6, 2025
-**Status:** ✅ Phase 1 Implemented with Semantic Fallback
+**Status:** ✅ Phase 1 Implemented (Exact CVE Matching)
 
 ---
 
@@ -40,7 +40,6 @@ User Query
 #### Embedding Model
 - **Model:** `all-MiniLM-L6-v2` (SentenceTransformers)
 - **Dimensions:** 384
-- **Performance:** ~14ms per query
 - **Domain:** General-purpose semantic embeddings
 
 #### Vector Database
@@ -119,7 +118,7 @@ Documents stored with rich metadata:
 | **Semantic Understanding** | Handles paraphrased queries, synonyms, conceptual matches | Good for exploratory queries |
 | **Low Latency** | ~14ms embedding + ~8ms vector search | Fast user experience |
 | **Quarantine-Aware** | Automatically excludes flagged documents | Security feature working |
-| **Scalable** | HNSW index scales to 100K+ documents | Production-ready indexing |
+| **Scalable** | HNSW index scales to 100K+ documents | High scale indexing |
 | **Clean Architecture** | Async, modular, type-hinted | Easy to extend |
 
 ### 1.6 Weaknesses of Current Model
@@ -194,7 +193,7 @@ Query `"How to mitigate CVE-2024-0004?"` retrieves `CVE-2024-0003.txt` instead o
 
 **Goal:** Fix CVE ID mismatch with minimal architectural changes (2-4 hours implementation).
 
-**Strategy:** Multi-stage retrieval with exact matching and intelligent fallback
+**Strategy:** Metadata-enhanced retrieval with exact CVE matching
 
 ```
 Query: "How to mitigate CVE-2024-0004?"
@@ -207,35 +206,31 @@ Query: "How to mitigate CVE-2024-0004?"
     - Boost important terms in query text
     - Repeat CVE ID 3x: "CVE-2024-0004 CVE-2024-0004 CVE-2024-0004 how to mitigate"
     ↓
-[Stage 2: Exact CVE Match Attempt]
+[Stage 2: Metadata-Filtered Retrieval]
     - IF CVE ID found in query:
         → ChromaDB WHERE filter: cve_ids $eq "CVE-2024-0004"
-        → Try exact match retrieval
+        → Retrieve with exact match filter
     - ELSE:
-        → Skip to Stage 4 (semantic search)
+        → Pure semantic search (no filter)
     ↓
-[Stage 3: Intelligent Fallback]
-    - IF exact match returned < k documents:
-        → Log: "Exact CVE match insufficient, falling back to semantic search"
-        → Retry WITHOUT metadata filter (pure semantic)
+[Stage 3: Handle Quarantine]
+    - IF exact match returned 0 documents:
+        → Log: "CVE document quarantined or not found"
+        → Return clear message to user about quarantine
     - ELSE:
-        → Use exact match results
+        → Continue with EDR integrity checks
     ↓
-[Stage 4: Semantic Search]
-    - Run vector search on augmented query
-    - Returns semantically similar documents
-    ↓
-[Stage 5: EDR Integrity Checks]
+[Stage 4: EDR Integrity Checks]
     - Evaluate retrieved documents
     - Quarantine suspicious docs
     ↓
-Return Top-K Clean Documents
+Return Top-K Clean Documents or Quarantine Message
 ```
 
-**Key Innovation:** Two-tiered fallback ensures robustness:
+**Key Innovation:** Exact CVE matching with clear quarantine communication:
 1. Try exact CVE match first (preferred for accuracy)
-2. Fall back to semantic if exact match quarantined/missing (ensures availability)
-3. Augmented query helps both stages perform well
+2. If no results, show clear quarantine message (user transparency)
+3. Augmented query boosts CVE ID importance in embedding space
 
 ### 3.2 Implementation Plan
 
@@ -738,11 +733,6 @@ class HybridRetriever:
 - CVE-2024-0003 has better "mitigation" language → Slightly higher
 - But RRF combines both → CVE-2024-0004 wins overall
 
-#### Performance
-
-- **Latency:** +15ms (BM25 search) + 5ms (RRF fusion) = **~20ms overhead**
-- **Acceptable:** Total query time ~50ms (vector) + 20ms (hybrid) = 70ms (still fast)
-
 ---
 
 ### 4.2 Cross-Encoder Re-Ranking
@@ -863,7 +853,7 @@ class RAGPipeline:
 |-----------|-------------|
 | **Highest Precision** | Cross-encoders outperform bi-encoders on all benchmarks (MS MARCO, BEIR) |
 | **Query-Document Interaction** | Model sees both together, captures nuanced relevance |
-| **Proven Effective** | +10-15% precision improvement in production systems |
+| **Proven Effective** | +10-15% precision improvement in systems |
 | **Easy Integration** | Drop-in replacement for re-ranking step |
 | **Pre-trained Models** | No training needed, use MS MARCO models |
 | **Corrects Vector Errors** | Fixes mistakes from Stage 1 retrieval |
@@ -878,26 +868,7 @@ class RAGPipeline:
 | **GPU Benefits** | 10x faster on GPU, slower on CPU | Run on CPU, optimize batch size |
 | **Another Model to Manage** | Adds deployment complexity | Worth it for quality gain |
 
-#### Performance Benchmarks
 
-**Test: CVE-2024-0004 Query**
-
-| Stage | Top 5 Results | Correct Doc Rank |
-|-------|---------------|------------------|
-| Vector Retrieval | CVE-0003, CVE-0002, CVE-0001, Best-Practices, CVE-0006 | Not in top 5 |
-| After Re-Ranking | **CVE-0004**, CVE-0003, Best-Practices, CVE-0002, CVE-0001 | **#1 (promoted)** |
-
-**Why it helps:**
-- Cross-encoder sees "CVE-2024-0004" in both query and document
-- Recognizes exact match as highly relevant
-- Promotes from rank #8 to rank #1
-
-#### When to Use
-
-- **Always:** If latency <500ms acceptable (most use cases)
-- **Skip:** If ultra-low latency required (<100ms) or very large k (k>50)
-
----
 
 ### 4.3 Fine-Tuned Domain Embeddings
 
@@ -964,7 +935,7 @@ model.fit(
 | Source | Examples | Effort |
 |--------|----------|--------|
 | **Synthetic (GPT-4)** | Generate queries for each CVE: "How to fix X?", "Is X critical?" | Low (1 hour) |
-| **Query Logs** | Real user queries from demo/production | Medium (1 day) |
+| **Query Logs** | Real user queries from demo | Medium (1 day) |
 | **Manual Annotation** | Security experts label query-doc pairs | High (3 days) |
 
 **Recommended:** Start with synthetic, validate with small manual set.
@@ -1174,40 +1145,7 @@ Execute plan with iterative retrieval
 
 ## 6. Performance Considerations
 
-### 6.1 Latency Budget
-
-| Component | Current | Phase 1 | Phase 2 (Hybrid) | Phase 2 (Rerank) |
-|-----------|---------|---------|------------------|------------------|
-| Query preprocessing | 0ms | +2ms | +2ms | +2ms |
-| Entity extraction | 0ms | +1ms | +1ms | +1ms |
-| Vector search | 22ms | 22ms | 22ms | 22ms |
-| BM25 search | - | - | +15ms | +15ms |
-| RRF fusion | - | - | +5ms | +5ms |
-| Re-ranking | - | - | - | +200ms |
-| **Total** | **22ms** | **25ms** | **45ms** | **245ms** |
-
-**Acceptable:** <300ms for interactive queries (standard for search systems)
-
-### 6.2 Storage Overhead
-
-| Component | Size | Notes |
-|-----------|------|-------|
-| Vector index (current) | 120MB | 1000 docs × 384 dim × 4 bytes |
-| BM25 index | +24MB | Tokenized corpus (20% of original) |
-| Cross-encoder model | +80MB | ms-marco-MiniLM-L-6-v2 |
-| **Total** | **224MB** | Fits in RAM on standard VM |
-
-### 6.3 Scalability
-
-| Metric | Current | Phase 1 | Phase 2 |
-|--------|---------|---------|---------|
-| Max documents | 100K | 100K | 100K |
-| Ingestion time (1K docs) | 45s | 50s | 65s (+BM25 build) |
-| Query throughput | 100 QPS | 90 QPS | 60 QPS |
-| Memory usage | 300MB | 320MB | 450MB |
-
-**Bottleneck:** Re-ranking (CPU-bound, 200ms/query)
-**Solution:** Limit re-ranking to top-10 candidates (reduces to 100ms)
+Created prototype for demo purpose. To be determined. 
 
 ---
 
@@ -1289,13 +1227,6 @@ Execute plan with iterative retrieval
 {"is_quarantined": False}
 ```
 
-### B.3 Performance Notes
-
-- Metadata filters are **indexed** in ChromaDB → Fast (O(log n))
-- String `$contains` on list field: ~1-2ms overhead
-- Complex `$and` queries: ~3-5ms overhead
-- Acceptable for Phase 1 use case
-
 ---
 
 ## Appendix C: Recommended Tools & Libraries
@@ -1344,6 +1275,8 @@ python -m spacy download en_core_web_sm
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3 | 2025-02-06 | Removed semantic fallback, updated to reflect exact match with clear quarantine messaging |
+| 1.2 | 2025-02-06 | Added intelligent fallback implementation details |
 | 1.0 | 2025-02-05 | Initial document: Current model + Phase 1 plan + Suggestions |
 
 ---

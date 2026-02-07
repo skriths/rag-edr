@@ -13,7 +13,7 @@ RAGShield is a proof-of-concept system demonstrating **Endpoint Detection and Re
 **Current Capabilities:**
 - ✅ 4-signal integrity detection (trust, red flags, anomaly, semantic drift)
 - ✅ Automatic document quarantine with state management
-- ✅ **Phase 1: CVE ID exact matching with intelligent semantic fallback**
+- ✅ **Phase 1: CVE ID exact matching with clear quarantine messaging**
 - ✅ Blast radius analysis for compromised queries
 - ✅ Side-by-side unsafe vs. protected demo
 - ✅ Interactive dashboard with real-time updates
@@ -29,7 +29,7 @@ February 6, 2025
 **Issue:** Query "How to mitigate CVE-2024-0004?" retrieved wrong document (CVE-2024-0003) due to semantic similarity, preventing demo from working.
 
 ### Solution Implemented
-Three-component system with intelligent fallback:
+Three-component system with exact CVE matching:
 
 #### 1. Entity Extraction
 **File:** [`engine/utils/entity_extractor.py`](../engine/utils/entity_extractor.py)
@@ -48,42 +48,41 @@ Three-component system with intelligent fallback:
 #### 3. Metadata-Enriched Retrieval
 **Files:**
 - [`engine/adapters/vector_store.py`](../engine/adapters/vector_store.py) - Stores first CVE ID in metadata during ingestion
-- [`engine/pipeline.py`](../engine/pipeline.py) - Two-stage retrieval with fallback
+- [`engine/pipeline.py`](../engine/pipeline.py) - Metadata-filtered retrieval with clear quarantine messaging
 
 **Retrieval Flow:**
 ```
 1. Try exact CVE match: {"cve_ids": {"$eq": "CVE-2024-0004"}}
-2. If results < k: Log fallback event, retry with semantic search
-3. Continue with integrity checks on retrieved documents
+2. If results == 0: Return clear quarantine message to user
+3. Else: Continue with integrity checks on retrieved documents
 ```
 
 ### Key Features
 
-#### Intelligent Fallback
+#### Clear Quarantine Communication
 ```python
 # Example: CVE-2024-0004 query after poisoned doc quarantined
 
-# Attempt 1: Exact match
+# Attempt: Exact match
 retrieved = await vector_store.retrieve(
     "CVE-2024-0004 CVE-2024-0004 CVE-2024-0004 How to mitigate CVE-2024-0004?",
     metadata_filter={"cve_ids": {"$eq": "CVE-2024-0004"}}
 )
 # Result: 0 documents (poisoned doc quarantined)
 
-# Attempt 2: Automatic fallback
-if len(retrieved) < k:
-    logger.log("Exact CVE match insufficient, falling back to semantic search")
-    retrieved = await vector_store.retrieve(
-        "CVE-2024-0004 CVE-2024-0004 CVE-2024-0004 How to mitigate CVE-2024-0004?",
-        metadata_filter=None  # No filter, pure semantic
-    )
-# Result: 5 related documents (security best practices, similar CVEs, etc.)
+# Response: Clear message
+if len(retrieved) == 0:
+    logger.log("CVE document quarantined or not found")
+    return {
+        "answer": "The requested CVE document (CVE-2024-0004) has been quarantined...",
+        "quarantined_docs": ["CVE-2024-0004"]
+    }
 ```
 
 **Benefits:**
 - ✅ **First query:** Retrieves exact CVE doc → EDR quarantines → Demo works
-- ✅ **Second query:** Fallback to semantic → Returns related docs → System remains useful
-- ✅ **Transparency:** Logs fallback event for audit trail
+- ✅ **Second query:** Clear message about quarantine → No confusion
+- ✅ **Transparency:** Logs quarantine event for audit trail
 
 ### Technical Constraints Solved
 
@@ -102,15 +101,6 @@ if len(retrieved) < k:
 - Original query preserved for semantic context
 - **Overhead:** +1ms (negligible)
 
-### Performance Impact
-
-| Metric | Before Phase 1 | After Phase 1 | Change |
-|--------|----------------|---------------|--------|
-| **CVE Exact Match Precision** | 0% | 100% | +100% |
-| **Query Latency** | 247ms | 251ms | +4ms (1.6%) |
-| **Storage Overhead** | 120MB | 120MB | <1% (metadata only) |
-| **Test Coverage** | 0 tests | 27 tests | +27 tests |
-
 ### Test Results
 ```bash
 $ PYTHONPATH=/Users/kriths/workspace/rag-edr python3 tests/test_phase1_retrieval.py
@@ -125,7 +115,7 @@ Testing Integration... 4 tests ✓
 ### Known Limitations
 | Limitation | Impact | Mitigation |
 |------------|--------|------------|
-| **Single CVE per doc** | Multi-CVE docs store only first | Semantic fallback retrieves related docs |
+| **Single CVE per doc** | Multi-CVE docs store only first | Query augmentation boosts all CVE IDs in embedding |
 | **Typo in CVE ID** | Exact match fails | Query augmentation helps via embedding |
 | **No software filtering** | "MySQL CVE-2024-0004" doesn't filter by software | Phase 2 enhancement |
 | **No version precision** | "8.0.x" vs "8.1.x" semantically similar | Phase 3 enhancement |
@@ -145,7 +135,7 @@ Testing Integration... 4 tests ✓
 
 **Trigger Rule:** 2-of-4 signals below 50% → Quarantine
 
-**Status:** ✅ Production-ready
+**Status:** ✅ Hackathon-ready
 - Detects 100% of poisoned docs in corpus
 - Zero false positives on clean docs
 - ~45ms evaluation time per document
@@ -159,7 +149,7 @@ Testing Integration... 4 tests ✓
 - Audit trail: JSONL log of all state changes
 - Analyst actions: Confirm malicious, restore false positives, clear all
 
-**Status:** ✅ Production-ready
+**Status:** ✅ Hackathon-ready
 
 ### 3. Blast Radius Analysis
 **File:** [`engine/response/blast_radius.py`](../engine/response/blast_radius.py)
@@ -170,14 +160,14 @@ Testing Integration... 4 tests ✓
 - Document retrieval lineage
 - Severity classification: LOW → MEDIUM → HIGH → CRITICAL
 
-**Status:** ✅ Production-ready
+**Status:** ✅ Hackathon-ready
 
 ### 4. Event Logging
 **File:** [`engine/logging/event_logger.py`](../engine/logging/event_logger.py)
 
 **Event Types:**
 - RAG-1001: Integrity check passed
-- RAG-1002: Exact CVE match fallback (Phase 1)
+- RAG-1002: CVE document quarantined or not found (Phase 1)
 - RAG-1003: Document quarantined
 - RAG-2001: Quarantine initiated
 - RAG-3002: Blast radius high/critical
@@ -185,7 +175,7 @@ Testing Integration... 4 tests ✓
 
 **Format:** JSONL at `logs/events.jsonl`
 
-**Status:** ✅ Production-ready
+**Status:** ✅ Hackathon-ready
 
 ---
 
@@ -200,7 +190,7 @@ Testing Integration... 4 tests ✓
 - Visual differentiation: Red (unsafe) vs. Green (protected) borders
 - Real-time query execution
 
-**Status:** ✅ Production-ready
+**Status:** ✅ Hackathon-ready
 
 ### 2. Quarantine Management Dashboard
 **Features:**
@@ -209,7 +199,7 @@ Testing Integration... 4 tests ✓
 - Analyst actions: Confirm malicious, restore, clear all
 - Real-time updates via React state
 
-**Status:** ✅ Production-ready
+**Status:** ✅ Hackathon-ready
 
 ### 3. Event Log Viewer
 **Features:**
@@ -218,7 +208,7 @@ Testing Integration... 4 tests ✓
 - Expandable event details
 - Filter by category
 
-**Status:** ✅ Production-ready
+**Status:** ✅ Hackathon-ready
 
 ### 4. Blast Radius Visualization
 **Features:**
@@ -227,7 +217,7 @@ Testing Integration... 4 tests ✓
 - Severity indicator
 - False positive investigation link
 
-**Status:** ✅ Production-ready
+**Status:** ✅ Hackathon-ready
 
 ---
 
@@ -269,7 +259,7 @@ User Query
     ↓
 [Phase 1] Entity Extraction → Query Augmentation
     ↓
-[Phase 1] Metadata Filter + Semantic Fallback
+[Phase 1] Metadata-Filtered Retrieval (Exact CVE Match)
     ↓
 [EDR] 4-Signal Integrity Check
     ↓
@@ -323,10 +313,10 @@ PYTHONPATH=/Users/kriths/workspace/rag-edr python3 tests/test_phase1_retrieval.p
 ## Change Log
 
 ### 2025-02-06
-- ✅ **Phase 1 Complete:** CVE ID exact matching with semantic fallback
+- ✅ **Phase 1 Complete:** CVE ID exact matching with clear quarantine messaging
 - ✅ Added entity extraction utility (CVE ID extraction)
 - ✅ Added query preprocessing (augmentation + metadata filters)
-- ✅ Implemented intelligent fallback in pipeline
+- ✅ Implemented clear quarantine messaging for unavailable CVE docs
 - ✅ Fixed ChromaDB metadata constraints (list → string, $contains → $eq)
 - ✅ Created comprehensive test suite (27 unit tests, all passing)
 - ✅ Updated all documentation with Phase 1 details
@@ -343,10 +333,7 @@ PYTHONPATH=/Users/kriths/workspace/rag-edr python3 tests/test_phase1_retrieval.p
 - Fixed answer formatting (line breaks)
 - Renamed "Red Flag" to "Safety Score" in UI
 - Expanded corpus to 11 documents
-- Created QUERY_GUIDE.md with test scenarios
-- Created RED_FLAGS_SOURCES.md (OWASP, CWE, NIST, MITRE)
-- Created DEMO_SCRIPT.md (11-minute flow)
-- Created KNOWN_BEHAVIORS.md (vector search variance)
+- Expanded corpus to 11 documents (CVE-2024-0006, 0007, 0008)
 - Added unsafe query endpoint (/api/query/unsafe)
 - Implemented side-by-side answer comparison UI
 - Fixed quarantine restore/clear UI updates
@@ -372,7 +359,7 @@ PYTHONPATH=/Users/kriths/workspace/rag-edr python3 tests/test_phase1_retrieval.p
 - Cross-encoder re-ranking
 - +15% precision improvement expected
 
-**Benefit:** More robust than current metadata filter + semantic fallback
+**Benefit:** More robust than current metadata filter + semantic search
 
 ### Phase 3: Advanced Features (Research)
 **Effort:** 2-3 days
@@ -397,7 +384,7 @@ PYTHONPATH=/Users/kriths/workspace/rag-edr python3 tests/test_phase1_retrieval.p
 ### Limitations
 1. **Single CVE per document:** Stores only first CVE ID found
    - **Impact:** Minimal (corpus has 1 CVE per doc)
-   - **Mitigation:** Semantic fallback retrieves related docs
+   - **Mitigation:** Query augmentation boosts all CVE IDs in embedding space
 
 2. **No multi-CVE queries:** "Compare CVE-2024-0003 and CVE-2024-0004" uses first CVE only
    - **Impact:** May miss second CVE document
@@ -425,8 +412,13 @@ Currently **zero false positives** on clean corpus. If false positives occur:
 ### Operational Guides
 - [SETUP.md](SETUP.md) - Installation and configuration
 
-### Research & Context
-- [BLAST_RADIUS_EXPLAINED.md](BLAST_RADIUS_EXPLAINED.md) - Query lineage tracking
+### Phase 1 Documentation
+For detailed Phase 1 implementation, see [RETRIEVAL_SYSTEM.md](RETRIEVAL_SYSTEM.md) Section 3:
+- Multi-stage retrieval architecture
+- Entity extraction and query augmentation
+- Metadata filtering with clear quarantine messaging
+- ChromaDB constraints and solutions
+- Complete test suite (27 tests)
 
 ---
 
@@ -435,7 +427,7 @@ Currently **zero false positives** on clean corpus. If false positives occur:
 ### Demo Success (Primary Goal)
 - ✅ CVE-2024-0004 query shows unsafe vs. protected difference
 - ✅ EDR quarantine visibly demonstrated
-- ✅ Semantic fallback provides graceful degradation
+- ✅ Clear quarantine messaging provides user transparency
 - ✅ Zero system errors during demo
 - ✅ <300ms query latency (acceptable UX)
 
@@ -448,7 +440,7 @@ Currently **zero false positives** on clean corpus. If false positives occur:
 ### Research Success
 - ✅ Demonstrates feasibility of RAG-EDR concept
 - ✅ Shows value of multi-signal detection
-- ✅ Proves metadata + semantic hybrid approach works
+- ✅ Proves metadata-enriched retrieval approach works
 - ✅ Provides foundation for Phase 2/3 research
 
 ---
@@ -463,7 +455,7 @@ Currently **zero false positives** on clean corpus. If false positives occur:
 
 **Status:** Proof-of-Concept / Research Demo
 
-⚠️ **Not Production-Ready:** This system is for demonstration and research purposes. Production deployment requires:
+⚠️ **Not Hackathon-ready:** This system is for demonstration and research purposes. Production deployment requires:
 - Authentication and authorization
 - Rate limiting and DDoS protection
 - Compliance logging (GDPR, SOC 2, etc.)

@@ -34,21 +34,21 @@ User Query → Vector DB → [ALL documents] → LLM → Potentially Poisoned An
 RAGShield acts as a **security middleware** between retrieval and generation:
 
 ```
-User Query → [Phase 1: CVE ID Extraction] → Vector DB (Exact Match + Semantic Fallback)
-                                                    ↓
-                                           [RAGShield Inspection]
-                                                    ↓
-                                           4 Integrity Signals:
-                                           ✓ Source Trust (90%)
-                                           ✗ Red Flag Detection (34%) ← Malicious!
-                                           ✓ Anomaly Score (81%)
-                                           ✓ Semantic Drift (70%)
-                                                    ↓
-                                           2+ signals below 50%?
-                                                    ↓
-                                           [Quarantine Vault]
-                                                    ↓
-                                           [Clean Docs Only] → LLM → Safe Answer
+User Query → [Phase 1: CVE ID Extraction + Augmentation] → Vector DB (Exact Match)
+                                                                    ↓
+                                                          [RAGShield Inspection]
+                                                                    ↓
+                                                          4 Integrity Signals:
+                                                          ✓ Source Trust (90%)
+                                                          ✗ Red Flag Detection (34%) ← Malicious!
+                                                          ✓ Anomaly Score (81%)
+                                                          ✓ Semantic Drift (70%)
+                                                                    ↓
+                                                          2+ signals below 50%?
+                                                                    ↓
+                                                          [Quarantine Vault]
+                                                                    ↓
+                                                          [Clean Docs Only] → LLM → Safe Answer
 ```
 
 **Key Features:**
@@ -166,9 +166,19 @@ python3 run.py
 - **[Retrieval System](readme/RETRIEVAL_SYSTEM.md)** - Technical deep-dive: Current model, Phase 1 with fallback, Phase 2/3 roadmap
 - **[Scoring Guide](readme/SCORING_GUIDE.md)** - How integrity signals work
 
-### Phase 1: Intelligent Retrieval
-- **[Phase 1 Implementation](readme/PHASE1_IMPLEMENTATION.md)** - Complete guide: CVE exact matching, test results, migration
-- **[Phase 1 ChromaDB Fix](readme/PHASE1_FIX_CHROMADB.md)** - Metadata storage format (list → string, $contains → $eq)
+### Phase 1: Intelligent Retrieval (February 6, 2025)
+**Implemented Features:**
+- ✅ CVE ID entity extraction and metadata enrichment
+- ✅ Query augmentation (term boosting in embedding space)
+- ✅ Exact CVE match with automatic semantic fallback
+- ✅ Event logging (RAG-1002) for fallback transparency
+- ✅ 27 unit tests, all passing
+- ✅ ChromaDB metadata constraints resolved ($eq operator)
+
+**Key Technical Details:**
+- Hybrid retrieval: Metadata pre-filter + semantic ranking
+- Intelligent fallback: Exact → Semantic (if insufficient results)
+- See [RETRIEVAL_SYSTEM.md](readme/RETRIEVAL_SYSTEM.md) for implementation details
 
 ---
 
@@ -194,9 +204,8 @@ Frontend (React) ← SSE → FastAPI Backend
 ```
 
 **Performance:**
-- Phase 1 overhead: +4ms (CVE extraction + metadata filter)
-- EDR overhead: ~45ms (integrity checks)
-- Total: ~250ms end-to-end (<300ms target ✓)
+- To be determined. Prototyped for demo purposes.
+- Machine related limitation affect performance
 
 ---
 
@@ -214,17 +223,6 @@ Protected Mode:
 - Exact CVE match → CVE-2024-0004-poisoned.txt
 - EDR detects: Trust 30%, Safety 34% → QUARANTINED
 - Shows: "Documents flagged for security review"
-```
-
-**Phase 1 Demo: Semantic Fallback**
-```
-Query: "How to mitigate CVE-2024-0004?" (2nd time, after quarantine)
-
-Protected Mode:
-- Exact match: 0 docs (quarantined)
-- Log: "Exact CVE match insufficient, falling back to semantic search"
-- Semantic search: Returns related security docs
-- Shows: General guidance from trusted sources
 ```
 
 **Clean Query:**

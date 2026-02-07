@@ -335,13 +335,6 @@ Analyst Clicks Document
 - **Concurrent Users:** 1-2 (single-threaded)
 - **Query Throughput:** 1-2 queries/minute (LLM limited)
 
-### Production Targets (Phase 3)
-- **Corpus Size:** 100,000+ documents
-- **Concurrent Users:** 100+
-- **Query Throughput:** 100+ queries/minute
-- **Vector DB:** Pinecone/Milvus for scale
-- **LLM:** Batching + GPU cluster
-
 ---
 
 ## Security Model

@@ -8,7 +8,7 @@
 |----------|---------|-------------|-------|
 | **RAM** | 16GB | 32GB | Mistral model requires ~8GB during inference |
 | **Disk Space** | 10GB free | 20GB free | 4GB for Mistral, 6GB for dependencies |
-| **CPU** | 4 cores | 8+ cores | GPU optional but recommended for production |
+| **CPU** | 4 cores | 8+ cores | GPU optional but recommended for performance |
 | **Network** | Stable connection | - | For Ollama and pip downloads |
 
 ### Software Requirements
@@ -596,12 +596,6 @@ python3 run.py
 # Ollama automatically uses GPU if available
 nvidia-smi  # Check GPU usage during queries
 ```
-
-### Production Optimization (Phase 3)
-- Use dedicated vector DB (Pinecone, Milvus)
-- GPU cluster for LLM inference
-- Redis cache for frequent queries
-- Load balancer for multiple instances
 
 ---
 
