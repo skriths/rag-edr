@@ -48,6 +48,9 @@ class BlastRadiusAnalyzer:
             action_taken=action_taken
         )
 
+        # Ensure parent directory exists (handles reset scenarios)
+        self.lineage_log.parent.mkdir(parents=True, exist_ok=True)
+
         with open(self.lineage_log, "a", encoding='utf-8') as f:
             f.write(lineage.model_dump_json() + "\n")
 

@@ -345,31 +345,36 @@ async def reset_demo():
     WARNING: This deletes all data!
     """
     try:
+        # Clear ChromaDB first
+        await vector_store.reset()
+
         # Clear logs
         if config.LOGS_DIR.exists():
             shutil.rmtree(config.LOGS_DIR)
-            config.LOGS_DIR.mkdir()
+        config.LOGS_DIR.mkdir(exist_ok=True)
 
         # Clear vault
         if config.VAULT_DIR.exists():
             shutil.rmtree(config.VAULT_DIR)
-            config.VAULT_DIR.mkdir()
+        config.VAULT_DIR.mkdir(exist_ok=True)
 
-        # Clear ChromaDB
-        await vector_store.reset()
+        # Ensure log file can be written
+        config.EVENT_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        config.LINEAGE_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-        # Log reset
+        # Log reset (after ensuring directory exists)
         await logger.log_system_event(
             event_id=4004,
-            message="System reset initiated - all data cleared"
+            message="Demo reset completed - all state cleared"
         )
 
         return {
             "status": "reset",
-            "message": "All state cleared successfully"
+            "message": "All state cleared successfully. Ready for demo."
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}\n{traceback.format_exc()}")
 
 
 @app.get("/api/status", response_model=SystemStatus)

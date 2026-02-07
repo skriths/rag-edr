@@ -40,6 +40,9 @@ class EventLogger:
             event: Event object to log
         """
         async with self.lock:
+            # Ensure parent directory exists (handles reset scenarios)
+            self.log_path.parent.mkdir(parents=True, exist_ok=True)
+
             with open(self.log_path, "a") as f:
                 f.write(event.to_jsonl() + "\n")
 
