@@ -185,6 +185,9 @@ Query `"How to mitigate CVE-2024-0004?"` retrieves `CVE-2024-0003.txt` instead o
 - Doc 2: "MySQL 8.1.x" (shouldn't match)
 - **Problem:** Both rank similarly (semantic embeddings blur version differences)
 
+### Fixes:
+- Partially fixed with CVE ID matches
+- Further fine tuning will be attempted for faster retrieval and better matches.
 ---
 
 ## 3. Phase 1: Quick Wins Implementation
