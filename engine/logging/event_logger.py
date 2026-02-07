@@ -6,7 +6,7 @@ Thread-safe async logging for SIEM integration.
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from engine.schemas import Event, EventLevel, EventCategory, IntegritySignals
@@ -95,7 +95,8 @@ class EventLogger:
         doc_id: str,
         reason: str,
         action: str = "initiated",
-        analyst: Optional[str] = None
+        analyst: Optional[str] = None,
+        integrity_signals: Optional[Dict[str, Any]] = None
     ):
         """
         Log quarantine-related action.
@@ -115,19 +116,25 @@ class EventLogger:
         event_id = event_id_map.get(action, 2001)
         level = EventLevel.WARNING if action == "initiated" else EventLevel.INFORMATION
 
+        details = {
+            "quarantine_id": quarantine_id,
+            "doc_id": doc_id,
+            "reason": reason,
+            "action": action,
+            "analyst": analyst
+        }
+
+        # Include integrity signals if provided (for live dashboard updates)
+        if integrity_signals:
+            details["integrity_signals"] = integrity_signals
+
         event = Event(
             event_id=event_id,
             level=level,
             category=EventCategory.QUARANTINE,
             message=f"Document {action}: {doc_id}",
             user_id=analyst or "system",
-            details={
-                "quarantine_id": quarantine_id,
-                "doc_id": doc_id,
-                "reason": reason,
-                "action": action,
-                "analyst": analyst
-            }
+            details=details
         )
         await self.log_event(event)
 

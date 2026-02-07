@@ -19,8 +19,9 @@ function App() {
                 setEvents(prev => [event, ...prev].slice(0, 100)); // Keep last 100
 
                 // Extract integrity signals from quarantine events
-                if (event.event_id === 2001 && event.metadata && event.metadata.integrity_signals) {
-                    setLatestSignals(event.metadata.integrity_signals);
+                if (event.event_id === 2001 && event.details && event.details.integrity_signals) {
+                    console.log("Integrity signals received:", event.details.integrity_signals);
+                    setLatestSignals(event.details.integrity_signals);
                 }
             } catch (error) {
                 console.error("Error parsing event:", error);
@@ -444,7 +445,7 @@ function BlastRadiusPanel({ report }) {
         trust_score: { icon: '🏢', name: 'Trust Score' },
         red_flag_score: { icon: '🚩', name: 'Safety Score' },
         anomaly_score: { icon: '📊', name: 'Anomaly Score' },
-        semantic_drift_score: { icon: '🎯', name: 'Alignment' }
+        semantic_drift_score: { icon: '🎯', name: 'Alignment Score' }
     };
 
     return (
@@ -469,7 +470,7 @@ function BlastRadiusPanel({ report }) {
                 {report.integrity_signals && (
                     <div style={{marginTop: '15px', padding: '12px', background: '#252525', borderRadius: '6px', border: '1px solid #444'}}>
                         <div style={{fontSize: '13px', fontWeight: 'bold', color: '#ff9800', marginBottom: '10px'}}>
-                            Integrity Signals (Why Quarantined)
+                            Integrity Signals
                         </div>
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
                             {Object.entries(signalLabels).map(([key, label]) => {
@@ -491,7 +492,7 @@ function BlastRadiusPanel({ report }) {
                         </div>
                         {report.quarantine_reason && (
                             <div style={{fontSize: '11px', color: '#666', marginTop: '8px', fontStyle: 'italic'}}>
-                                Reason: {report.quarantine_reason}
+                                Reason: {report.quarantine_reason.replace(/\.\s*Red flags:.*?detected\.?/i, '.')}
                             </div>
                         )}
                     </div>

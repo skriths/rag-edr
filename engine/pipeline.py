@@ -190,12 +190,19 @@ class RAGPipeline:
         # Mark quarantined in vector store
         await vector_store.mark_quarantined(doc["doc_id"], record.quarantine_id)
 
-        # Log quarantine action
+        # Log quarantine action with integrity signals for dashboard
         await logger.log_quarantine_action(
             quarantine_id=record.quarantine_id,
             doc_id=doc["doc_id"],
             reason=reason,
-            action="initiated"
+            action="initiated",
+            integrity_signals={
+                "trust_score": signals.trust_score,
+                "red_flag_score": signals.red_flag_score,
+                "anomaly_score": signals.anomaly_score,
+                "semantic_drift_score": signals.semantic_drift_score,
+                "combined_score": signals.combined_score
+            }
         )
 
     async def initialize(self):
