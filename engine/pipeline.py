@@ -67,25 +67,30 @@ class RAGPipeline:
             metadata_filter=metadata_filter
         )
 
-        # Phase 1: Intelligent fallback - if exact CVE match insufficient, use semantic search
-        if metadata_filter and len(retrieved) < k:
+        # Phase 1: Check if exact CVE match failed (likely quarantined or not ingested)
+        if metadata_filter and len(retrieved) == 0:
+            # Extract CVE ID for clear messaging
+            from engine.utils.entity_extractor import EntityExtractor
+            cve_ids = EntityExtractor.extract_cve_ids(query_text)
+            cve_id = cve_ids[0] if cve_ids else "unknown"
+
             await logger.log_system_event(
                 event_id=1002,
-                message=f"Exact CVE match returned {len(retrieved)} docs, falling back to semantic search",
+                message=f"Exact CVE match for {cve_id} returned 0 docs (quarantined or not found)",
                 details={
                     "query_id": query_id,
                     "filter": metadata_filter,
-                    "results_found": len(retrieved)
+                    "cve_id": cve_id
                 }
             )
 
-            # Retry with semantic search only (no metadata filter)
-            retrieved = await vector_store.retrieve(
-                augmented_query,
-                k=k,
-                exclude_quarantined=True,
-                metadata_filter=None  # Fallback to pure semantic search
-            )
+            return {
+                "answer": f"The requested CVE document ({cve_id}) has been quarantined due to security concerns and is not available. Please contact your security team for alternative guidance.",
+                "retrieved_docs": [],
+                "quarantined_docs": [cve_id],
+                "integrity_signals": {},
+                "query_id": query_id
+            }
 
         if not retrieved:
             await logger.log_system_event(
