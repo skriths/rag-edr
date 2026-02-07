@@ -492,7 +492,7 @@ function BlastRadiusPanel({ report }) {
                         </div>
                         {report.quarantine_reason && (
                             <div style={{fontSize: '11px', color: '#666', marginTop: '8px', fontStyle: 'italic'}}>
-                                Reason: {report.quarantine_reason.replace(/\.\s*Red flags:.*?detected\.?/i, '.')}
+                                Reason: {report.quarantine_reason}
                             </div>
                         )}
                     </div>

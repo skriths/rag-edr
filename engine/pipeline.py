@@ -67,6 +67,26 @@ class RAGPipeline:
             metadata_filter=metadata_filter
         )
 
+        # Phase 1: Intelligent fallback - if exact CVE match insufficient, use semantic search
+        if metadata_filter and len(retrieved) < k:
+            await logger.log_system_event(
+                event_id=1002,
+                message=f"Exact CVE match returned {len(retrieved)} docs, falling back to semantic search",
+                details={
+                    "query_id": query_id,
+                    "filter": metadata_filter,
+                    "results_found": len(retrieved)
+                }
+            )
+
+            # Retry with semantic search only (no metadata filter)
+            retrieved = await vector_store.retrieve(
+                augmented_query,
+                k=k,
+                exclude_quarantined=True,
+                metadata_filter=None  # Fallback to pure semantic search
+            )
+
         if not retrieved:
             await logger.log_system_event(
                 event_id=1001,
@@ -174,8 +194,7 @@ class RAGPipeline:
         reason = (
             f"Triggered quarantine on query {query_id}. "
             f"Low signals: {', '.join(report['low_signals'])}. "
-            f"Combined score: {signals.combined_score:.2f}. "
-            f"Red flags: {report['red_flags']['total_count']} detected."
+            f"Combined score: {signals.combined_score:.2f}."
         )
 
         # Quarantine in vault

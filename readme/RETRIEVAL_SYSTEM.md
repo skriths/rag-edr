@@ -1,8 +1,8 @@
 # RAGShield Retrieval System: Technical Reference
 
-**Document Version:** 1.1
-**Last Updated:** February 5, 2025
-**Status:** ✅ Phase 1 Implemented
+**Document Version:** 1.2
+**Last Updated:** February 6, 2025
+**Status:** ✅ Phase 1 Implemented with Semantic Fallback
 
 ---
 
@@ -194,32 +194,48 @@ Query `"How to mitigate CVE-2024-0004?"` retrieves `CVE-2024-0003.txt` instead o
 
 **Goal:** Fix CVE ID mismatch with minimal architectural changes (2-4 hours implementation).
 
-**Strategy:** Two-stage retrieval with exact matching priority
+**Strategy:** Multi-stage retrieval with exact matching and intelligent fallback
 
 ```
 Query: "How to mitigate CVE-2024-0004?"
     ↓
-[Stage 1: Entity Extraction]
+[Stage 0: Entity Extraction]
     - Extract CVE IDs: ["CVE-2024-0004"]
-    - Extract software: ["MySQL"] (optional)
+    - Extract software: ["MySQL"] (future)
     ↓
-[Stage 2: Metadata Filtering]
-    - IF CVE ID found in query:
-        → ChromaDB WHERE filter: cve_ids CONTAINS "CVE-2024-0004"
-        → Returns exact match documents
-    - ELSE:
-        → Fallback to pure semantic search (current behavior)
-    ↓
-[Stage 3: Query Augmentation]
+[Stage 1: Query Augmentation]
     - Boost important terms in query text
     - Repeat CVE ID 3x: "CVE-2024-0004 CVE-2024-0004 CVE-2024-0004 how to mitigate"
     ↓
+[Stage 2: Exact CVE Match Attempt]
+    - IF CVE ID found in query:
+        → ChromaDB WHERE filter: cve_ids $eq "CVE-2024-0004"
+        → Try exact match retrieval
+    - ELSE:
+        → Skip to Stage 4 (semantic search)
+    ↓
+[Stage 3: Intelligent Fallback]
+    - IF exact match returned < k documents:
+        → Log: "Exact CVE match insufficient, falling back to semantic search"
+        → Retry WITHOUT metadata filter (pure semantic)
+    - ELSE:
+        → Use exact match results
+    ↓
 [Stage 4: Semantic Search]
     - Run vector search on augmented query
-    - Combine with metadata-filtered results
+    - Returns semantically similar documents
     ↓
-Return Top-K Documents
+[Stage 5: EDR Integrity Checks]
+    - Evaluate retrieved documents
+    - Quarantine suspicious docs
+    ↓
+Return Top-K Clean Documents
 ```
+
+**Key Innovation:** Two-tiered fallback ensures robustness:
+1. Try exact CVE match first (preferred for accuracy)
+2. Fall back to semantic if exact match quarantined/missing (ensures availability)
+3. Augmented query helps both stages perform well
 
 ### 3.2 Implementation Plan
 

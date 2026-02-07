@@ -503,8 +503,6 @@ rag-edr/
 ├── readme/                     # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── COMPONENTS.md
-│   ├── QUERY_GUIDE.md
-│   ├── DEMO_SCRIPT.md
 │   └── ...
 │
 ├── chroma_db/                  # ChromaDB storage (created on ingest)
@@ -609,8 +607,6 @@ nvidia-smi  # Check GPU usage during queries
 
 ## Next Steps
 
-- **For Demo:** See [DEMO_SCRIPT.md](DEMO_SCRIPT.md) for 11-minute flow
-- **For Testing:** See [QUERY_GUIDE.md](QUERY_GUIDE.md) for test scenarios
 - **For Architecture:** See [ARCHITECTURE.md](ARCHITECTURE.md) for system design
 - **For Components:** See [COMPONENTS.md](COMPONENTS.md) for deep dive
 
@@ -621,7 +617,6 @@ nvidia-smi  # Check GPU usage during queries
 **Documentation:**
 - [Architecture](ARCHITECTURE.md) - System design
 - [Components](COMPONENTS.md) - Component details
-- [Query Guide](QUERY_GUIDE.md) - Test scenarios
 - [Implementation Status](IMPLEMENTATION_STATUS.md) - What's done/planned
 
 **Logs:**
