@@ -188,6 +188,8 @@ class BlastRadiusReport(BaseModel):
     severity: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     recommended_actions: List[str]
     query_details: List[Dict[str, Any]] = Field(default_factory=list)
+    integrity_signals: Optional[Dict[str, Any]] = None  # Integrity scores at quarantine time
+    quarantine_reason: Optional[str] = None  # Why document was quarantined
 
     class Config:
         # Allow sets in Pydantic model

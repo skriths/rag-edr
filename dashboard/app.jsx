@@ -362,6 +362,8 @@ function QuarantineVault({ quarantined, onSelectDoc, onConfirm, onRestore, onCle
 
 // Blast Radius Panel Component
 function BlastRadiusPanel({ report }) {
+    const [showJson, setShowJson] = React.useState(false);
+
     if (!report) {
         return (
             <div className="panel">
@@ -391,6 +393,19 @@ function BlastRadiusPanel({ report }) {
         );
     }
 
+    const getScoreColor = (score) => {
+        if (score >= 0.7) return '#4CAF50';
+        if (score >= 0.5) return '#FFC107';
+        return '#f44336';
+    };
+
+    const signalLabels = {
+        trust_score: { icon: '🏢', name: 'Trust Score' },
+        red_flag_score: { icon: '🚩', name: 'Safety Score' },
+        anomaly_score: { icon: '📊', name: 'Anomaly Score' },
+        semantic_drift_score: { icon: '🎯', name: 'Alignment' }
+    };
+
     return (
         <div className="panel">
             <div className="panel-title">Blast Radius Analysis</div>
@@ -408,6 +423,39 @@ function BlastRadiusPanel({ report }) {
                         {report.severity}
                     </span>
                 </div>
+
+                {/* Integrity Signals */}
+                {report.integrity_signals && (
+                    <div style={{marginTop: '15px', padding: '12px', background: '#252525', borderRadius: '6px', border: '1px solid #444'}}>
+                        <div style={{fontSize: '13px', fontWeight: 'bold', color: '#ff9800', marginBottom: '10px'}}>
+                            Integrity Signals (Why Quarantined)
+                        </div>
+                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px'}}>
+                            {Object.entries(signalLabels).map(([key, label]) => {
+                                const score = report.integrity_signals[key];
+                                if (score === undefined) return null;
+                                const failed = score < 0.5;
+                                return (
+                                    <div key={key} style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                                        <span style={{fontSize: '16px'}}>{label.icon}</span>
+                                        <div style={{flex: 1}}>
+                                            <div style={{fontSize: '11px', color: '#888'}}>{label.name}</div>
+                                            <div style={{fontSize: '16px', fontWeight: 'bold', color: getScoreColor(score)}}>
+                                                {(score * 100).toFixed(0)}% {failed ? '❌' : '✅'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        {report.quarantine_reason && (
+                            <div style={{fontSize: '11px', color: '#666', marginTop: '8px', fontStyle: 'italic'}}>
+                                Reason: {report.quarantine_reason}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div style={{marginTop: '15px'}}>
                     <div><strong>Affected Queries:</strong> {report.affected_queries}</div>
                     <div><strong>Affected Users:</strong> {report.affected_users.length}</div>
@@ -455,6 +503,41 @@ function BlastRadiusPanel({ report }) {
                         </div>
                     </div>
                 )}
+
+                {/* JSON View for Splunk Integration */}
+                <div style={{marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px'}}>
+                    <button
+                        className="btn"
+                        onClick={() => setShowJson(!showJson)}
+                        style={{
+                            fontSize: '11px',
+                            padding: '6px 12px',
+                            background: '#555',
+                            marginBottom: '10px'
+                        }}
+                    >
+                        {showJson ? '▼ Hide' : '▶ Show'} Raw JSON (SIEM Export)
+                    </button>
+
+                    {showJson && (
+                        <div style={{
+                            marginTop: '10px',
+                            padding: '12px',
+                            background: '#0a0a0a',
+                            border: '1px solid #333',
+                            borderRadius: '4px',
+                            fontFamily: 'monospace',
+                            fontSize: '11px',
+                            color: '#e0e0e0',
+                            maxHeight: '300px',
+                            overflowY: 'auto',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-all'
+                        }}>
+                            {JSON.stringify(report, null, 2)}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

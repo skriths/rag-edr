@@ -116,12 +116,25 @@ class BlastRadiusAnalyzer:
             doc_id
         )
 
-        # Get file path from quarantine vault
+        # Get file path and integrity signals from quarantine vault
         from engine.response.quarantine_vault import quarantine_vault
+        import json
         file_path = None
+        integrity_signals = None
+        quarantine_reason = None
+
         for q_dir in config.VAULT_DIR.glob(f"*-{doc_id}"):
             if q_dir.is_dir():
                 file_path = str(q_dir / "content.txt")
+                # Read quarantine record for integrity signals
+                record_file = q_dir / "record.json"
+                if record_file.exists():
+                    try:
+                        record_data = json.loads(record_file.read_text(encoding='utf-8'))
+                        integrity_signals = record_data.get('integrity_scores')
+                        quarantine_reason = record_data.get('reason')
+                    except Exception:
+                        pass
                 break
 
         return BlastRadiusReport(
@@ -133,7 +146,9 @@ class BlastRadiusAnalyzer:
             time_window_end=latest_time if affected_queries else datetime.utcnow(),
             severity=severity,
             recommended_actions=recommendations,
-            query_details=affected_queries
+            query_details=affected_queries,
+            integrity_signals=integrity_signals,
+            quarantine_reason=quarantine_reason
         )
 
     def _calculate_severity(self, query_count: int, user_count: int) -> str:
