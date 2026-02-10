@@ -455,7 +455,7 @@ For detailed Phase 1 implementation, see [RETRIEVAL_SYSTEM.md](RETRIEVAL_SYSTEM.
 
 **Status:** Proof-of-Concept / Research Demo
 
-⚠️ **Not Hackathon-ready:** This system is for demonstration and research purposes. Production deployment requires:
+⚠️ This system is for demonstration and research purposes. Production deployment requires:
 - Authentication and authorization
 - Rate limiting and DDoS protection
 - Compliance logging (GDPR, SOC 2, etc.)
